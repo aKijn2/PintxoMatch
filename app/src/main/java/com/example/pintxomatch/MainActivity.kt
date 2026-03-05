@@ -43,6 +43,7 @@ import com.google.firebase.database.Transaction
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -144,18 +145,45 @@ fun MainSwipeScreen(
     var pintxosFirebase by remember { mutableStateOf<List<Pintxo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var waitingPintxoId by remember { mutableStateOf<String?>(null) }
+    var waitingSecondsLeft by remember { mutableStateOf(0) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    fun notify(message: String) {
+        alertMessage = message
+    }
+
+    fun reloadPintxos() {
+        isLoading = true
+        val db = FirebaseFirestore.getInstance()
+        db.collection("Pintxos")
+            .orderBy(FieldPath.documentId())
+            .get()
+            .addOnSuccessListener { result ->
+                val listaNueva = result.map { doc ->
+                    Pintxo(
+                        id = doc.id,
+                        name = doc.getString("nombre") ?: "Sin nombre",
+                        barName = doc.getString("bar") ?: "Bar desconocido",
+                        location = doc.getString("ubicacion") ?: "Gipuzkoa",
+                        price = doc.getDouble("precio") ?: 0.0,
+                        imageUrl = doc.getString("imageUrl") ?: ""
+                    )
+                }
+                pintxosFirebase = listaNueva
+                isLoading = false
+            }
+            .addOnFailureListener {
+                isLoading = false
+                notify("Error cargando pintxos")
+            }
+    }
 
     LaunchedEffect(alertMessage) {
         alertMessage?.let {
             snackbarHostState.showSnackbar(it)
             alertMessage = null
         }
-    }
-
-    fun notify(message: String) {
-        alertMessage = message
     }
 
     DisposableEffect(waitingPintxoId, auth.currentUser?.uid) {
@@ -189,6 +217,35 @@ fun MainSwipeScreen(
 
             query.addValueEventListener(listener)
             onDispose { query.removeEventListener(listener) }
+        }
+    }
+
+    LaunchedEffect(waitingPintxoId) {
+        val targetPintxoId = waitingPintxoId
+        if (targetPintxoId.isNullOrBlank()) {
+            waitingSecondsLeft = 0
+            return@LaunchedEffect
+        }
+
+        waitingSecondsLeft = 10
+        repeat(10) {
+            delay(1000)
+            if (waitingPintxoId != targetPintxoId) return@LaunchedEffect
+            waitingSecondsLeft = (waitingSecondsLeft - 1).coerceAtLeast(0)
+        }
+
+        if (waitingPintxoId == targetPintxoId) {
+            val uid = auth.currentUser?.uid
+            if (!uid.isNullOrBlank()) {
+                realtimeDb.getReference("waitingByPintxo")
+                    .child(targetPintxoId)
+                    .child(uid)
+                    .removeValue()
+            }
+            waitingPintxoId = null
+            waitingSecondsLeft = 0
+            notify("Tiempo agotado. Te sacamos de la lista de espera.")
+            reloadPintxos()
         }
     }
 
@@ -254,6 +311,7 @@ fun MainSwipeScreen(
                             val myExistingChatId = myExistingChat?.key
                             if (!myExistingChatId.isNullOrBlank()) {
                                 waitingPintxoId = null
+                                waitingSecondsLeft = 0
                                 onNavigateToChat(myExistingChatId)
                             } else {
                                 waitingPintxoId = pintxo.id
@@ -284,6 +342,7 @@ fun MainSwipeScreen(
                 chatsRef.child(chatId).updateChildren(updates)
                     .addOnSuccessListener {
                         waitingPintxoId = null
+                        waitingSecondsLeft = 0
                         onNavigateToChat(chatId)
                     }
                     .addOnFailureListener {
@@ -320,6 +379,7 @@ fun MainSwipeScreen(
                 val existingChatId = existingChat?.key
                 if (!existingChatId.isNullOrBlank()) {
                     waitingPintxoId = null
+                    waitingSecondsLeft = 0
                     onNavigateToChat(existingChatId)
                     return@addOnSuccessListener
                 }
@@ -342,6 +402,7 @@ fun MainSwipeScreen(
                     chatsRef.child(joinableChatId).updateChildren(joinUpdates)
                         .addOnSuccessListener {
                             waitingPintxoId = null
+                            waitingSecondsLeft = 0
                             onNavigateToChat(joinableChatId)
                         }
                         .addOnFailureListener {
@@ -371,30 +432,9 @@ fun MainSwipeScreen(
             }
     }
 
-    // Descarga de datos de Firestore en tiempo real
+    // Descarga inicial de pintxos
     LaunchedEffect(Unit) {
-        val db = FirebaseFirestore.getInstance()
-        db.collection("Pintxos")
-            .orderBy(FieldPath.documentId())
-            .get()
-            .addOnSuccessListener { result ->
-                val listaNueva = result.map { doc ->
-                    Pintxo(
-                        id = doc.id,
-                        name = doc.getString("nombre") ?: "Sin nombre",
-                        barName = doc.getString("bar") ?: "Bar desconocido",
-                        location = doc.getString("ubicacion") ?: "Gipuzkoa",
-                        price = doc.getDouble("precio") ?: 0.0,
-                        imageUrl = doc.getString("imageUrl") ?: "" // Cargamos el link de internet
-                    )
-                }
-                pintxosFirebase = listaNueva
-                isLoading = false
-            }
-            .addOnFailureListener {
-                isLoading = false
-                notify("Error cargando pintxos")
-            }
+        reloadPintxos()
     }
 
     Scaffold(
@@ -444,7 +484,11 @@ fun MainSwipeScreen(
                     }
 
                     Text(
-                        text = "Desliza ← para pasar · → para hacer match",
+                        text = if (!waitingPintxoId.isNullOrBlank()) {
+                            "Buscando pareja... ${waitingSecondsLeft}s"
+                        } else {
+                            "Desliza ← para pasar · → para hacer match"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -477,6 +521,13 @@ fun MainSwipeScreen(
                                     detectDragGestures(
                                         onDragEnd = {
                                             coroutineScope.launch {
+                                                if (!waitingPintxoId.isNullOrBlank()) {
+                                                    offsetX.animateTo(0f)
+                                                    offsetY.animateTo(0f)
+                                                    notify("Ya estás esperando pareja")
+                                                    return@launch
+                                                }
+
                                                 if (offsetX.value > 300) {
                                                     offsetX.animateTo(1000f)
                                                     handlePrivateMatch(topPintxo)
@@ -492,6 +543,7 @@ fun MainSwipeScreen(
                                         },
                                         onDrag = { change, dragAmount ->
                                             change.consume()
+                                            if (!waitingPintxoId.isNullOrBlank()) return@detectDragGestures
                                             coroutineScope.launch {
                                                 offsetX.snapTo(offsetX.value + dragAmount.x)
                                                 offsetY.snapTo(offsetY.value + dragAmount.y)
