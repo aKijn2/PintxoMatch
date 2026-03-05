@@ -403,7 +403,7 @@ fun MainSwipeScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "PintxoMatch 🍢",
+                        text = "PintxoMatch",
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )

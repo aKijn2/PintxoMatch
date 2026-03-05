@@ -179,7 +179,7 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
                             )
                         }
                         Text(
-                            text = "Sube más pintxos y escala posiciones 🚀",
+                            text = "Sube más pintxos y escala posiciones",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         if (myRank != null) {
@@ -195,9 +195,9 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
 
             itemsIndexed(users.take(30)) { index, user ->
                 val medal = when (index) {
-                    0 -> "🥇"
-                    1 -> "🥈"
-                    2 -> "🥉"
+                    0 -> "1"
+                    1 -> "2"
+                    2 -> "3"
                     else -> "#${index + 1}"
                 }
 

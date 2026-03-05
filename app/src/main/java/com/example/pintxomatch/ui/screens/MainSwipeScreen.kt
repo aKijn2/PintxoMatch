@@ -48,7 +48,7 @@ fun MainSwipeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("PintxoMatch 🍢", fontWeight = FontWeight.Bold) },
+                title = { Text("PintxoMatch", fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = onNavigateToUpload) { Icon(Icons.Default.Add, "Subir") }
                     IconButton(onClick = onNavigateToProfile) { Icon(Icons.Default.Person, "Perfil") }
