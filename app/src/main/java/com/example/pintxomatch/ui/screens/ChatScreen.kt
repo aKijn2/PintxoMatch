@@ -43,8 +43,15 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
     var isCheckingAccess by remember { mutableStateOf(true) }
     var chatTitle by remember { mutableStateOf("Chat privado") }
     var chatIsActive by remember { mutableStateOf(true) }
+    var hasExited by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    fun exitChatOnce() {
+        if (hasExited) return
+        hasExited = true
+        onNavigateBack()
+    }
 
     fun currentDisplayName(): String {
         val user = auth.currentUser
@@ -57,7 +64,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         if (currentUid.isNullOrBlank()) {
             errorMessage = "Sesión no válida. Vuelve a iniciar sesión."
             isCheckingAccess = false
-            onNavigateBack()
+            exitChatOnce()
             return@LaunchedEffect
         }
 
@@ -107,19 +114,19 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                         } else {
                             isCheckingAccess = false
                             errorMessage = "No tienes acceso a este chat."
-                            onNavigateBack()
+                            exitChatOnce()
                         }
                     }
                     .addOnFailureListener {
                         isCheckingAccess = false
                         errorMessage = "No se pudo validar acceso al chat."
-                        onNavigateBack()
+                        exitChatOnce()
                     }
             }
             .addOnFailureListener {
                 isCheckingAccess = false
                 errorMessage = "No se pudo validar acceso al chat."
-                onNavigateBack()
+                exitChatOnce()
             }
     }
 
@@ -132,7 +139,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                     if (!snapshot.exists()) {
                         chatIsActive = false
                         errorMessage = "Este chat fue eliminado."
-                        onNavigateBack()
+                        exitChatOnce()
                         return
                     }
 
@@ -142,7 +149,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                     if (!stillParticipant) {
                         chatIsActive = false
                         errorMessage = "Ya no tienes acceso a este chat."
-                        onNavigateBack()
+                        exitChatOnce()
                         return
                     }
 
@@ -159,7 +166,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
 
     val navigateBackWithCleanup: () -> Unit = navigateBackWithCleanup@{
         if (!hasAccess) {
-            onNavigateBack()
+            exitChatOnce()
             return@navigateBackWithCleanup
         }
 
@@ -172,17 +179,17 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                             if (participantCount <= 1L) {
                                 chatRef.removeValue()
                             }
-                            onNavigateBack()
+                            exitChatOnce()
                         }
                         .addOnFailureListener {
-                            onNavigateBack()
+                            exitChatOnce()
                         }
                     return@addOnSuccessListener
                 }
-                onNavigateBack()
+                exitChatOnce()
             }
             .addOnFailureListener {
-                onNavigateBack()
+                exitChatOnce()
             }
     }
 
@@ -325,7 +332,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                     if (textToSend.isNotBlank()) {
                         if (!chatIsActive || !hasAccess) {
                             errorMessage = "Este chat ya no está disponible."
-                            onNavigateBack()
+                            exitChatOnce()
                             return@IconButton
                         }
 
@@ -338,7 +345,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
 
                                 if (!canWrite) {
                                     errorMessage = "Este chat fue cerrado."
-                                    onNavigateBack()
+                                    exitChatOnce()
                                     return@addOnSuccessListener
                                 }
 
@@ -379,7 +386,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                     onClick = {
                         showDeleteDialog = false
                         chatRef.removeValue()
-                            .addOnSuccessListener { onNavigateBack() }
+                            .addOnSuccessListener { exitChatOnce() }
                             .addOnFailureListener { error ->
                                 errorMessage = "No se pudo borrar: ${error.localizedMessage ?: "error desconocido"}"
                             }
