@@ -41,6 +41,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
     var hasAccess by remember { mutableStateOf(false) }
     var isCheckingAccess by remember { mutableStateOf(true) }
     var chatTitle by remember { mutableStateOf("Chat privado") }
+    var chatIsActive by remember { mutableStateOf(true) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     fun currentDisplayName(): String {
@@ -118,6 +119,40 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                 errorMessage = "No se pudo validar acceso al chat."
                 onNavigateBack()
             }
+    }
+
+    DisposableEffect(chatId, currentUid) {
+        if (currentUid.isNullOrBlank()) {
+            onDispose { }
+        } else {
+            val chatStateListener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    if (!snapshot.exists()) {
+                        chatIsActive = false
+                        errorMessage = "Este chat fue eliminado."
+                        onNavigateBack()
+                        return
+                    }
+
+                    val stillParticipant = snapshot.child("participants").child(currentUid)
+                        .getValue(Boolean::class.java) == true
+
+                    if (!stillParticipant) {
+                        chatIsActive = false
+                        errorMessage = "Ya no tienes acceso a este chat."
+                        onNavigateBack()
+                        return
+                    }
+
+                    chatIsActive = true
+                }
+
+                override fun onCancelled(error: DatabaseError) {}
+            }
+
+            chatRef.addValueEventListener(chatStateListener)
+            onDispose { chatRef.removeEventListener(chatStateListener) }
+        }
     }
 
     val navigateBackWithCleanup: () -> Unit = navigateBackWithCleanup@{
@@ -262,21 +297,43 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
 
                     val textToSend = messageText.trim()
                     if (textToSend.isNotBlank()) {
+                        if (!chatIsActive || !hasAccess) {
+                            errorMessage = "Este chat ya no está disponible."
+                            onNavigateBack()
+                            return@IconButton
+                        }
+
                         val senderName = currentDisplayName()
-                        val msg = ChatMessage(
-                            senderId = currentUser.uid,
-                            senderName = senderName,
-                            text = textToSend,
-                            timestamp = System.currentTimeMillis()
-                        )
-                        messagesRef.push().setValue(msg)
-                            .addOnSuccessListener {
-                                chatRef.child("updatedAt").setValue(System.currentTimeMillis())
-                                chatRef.child("participantNames").child(currentUser.uid).setValue(senderName)
-                                messageText = ""
+                        chatRef.get()
+                            .addOnSuccessListener { chatSnapshot ->
+                                val canWrite = chatSnapshot.exists() &&
+                                    (chatSnapshot.child("participants").child(currentUser.uid)
+                                        .getValue(Boolean::class.java) == true)
+
+                                if (!canWrite) {
+                                    errorMessage = "Este chat fue cerrado."
+                                    onNavigateBack()
+                                    return@addOnSuccessListener
+                                }
+
+                                val msg = ChatMessage(
+                                    senderId = currentUser.uid,
+                                    senderName = senderName,
+                                    text = textToSend,
+                                    timestamp = System.currentTimeMillis()
+                                )
+                                messagesRef.push().setValue(msg)
+                                    .addOnSuccessListener {
+                                        chatRef.child("updatedAt").setValue(System.currentTimeMillis())
+                                        chatRef.child("participantNames").child(currentUser.uid).setValue(senderName)
+                                        messageText = ""
+                                    }
+                                    .addOnFailureListener { error ->
+                                        errorMessage = "No se pudo enviar: ${error.localizedMessage ?: "error desconocido"}"
+                                    }
                             }
-                            .addOnFailureListener { error ->
-                                errorMessage = "No se pudo enviar: ${error.localizedMessage ?: "error desconocido"}"
+                            .addOnFailureListener {
+                                errorMessage = "No se pudo validar el chat."
                             }
                     }
                 }) {
