@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.core.view.WindowCompat
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.example.pintxomatch.ui.screens.ChatListScreen
@@ -49,6 +50,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        WindowCompat.getInsetsController(window, window.decorView)?.apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
+
         setContent {
             PintxoMatchTheme(darkTheme = false) {
                 // 1. EL PORTERO: Comprobamos si el usuario ya está logueado
