@@ -357,10 +357,60 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
             confirmButton = {
                 Button(
                     onClick = {
-                        user?.delete()?.addOnSuccessListener {
-                            alertMessage = "Cuenta eliminada"
-                            onLogout()
+                        val currentUser = user
+                        val uid = currentUser?.uid
+                        if (currentUser == null || uid.isNullOrBlank()) {
+                            alertMessage = "No se pudo validar la cuenta"
+                            return@Button
                         }
+
+                        val db = FirebaseFirestore.getInstance()
+                        db.collection("Pintxos")
+                            .whereEqualTo("uploaderUid", uid)
+                            .get()
+                            .addOnSuccessListener { result ->
+                                if (result.isEmpty) {
+                                    currentUser.delete()
+                                        .addOnSuccessListener {
+                                            alertMessage = "Cuenta eliminada"
+                                            onLogout()
+                                        }
+                                        .addOnFailureListener {
+                                            alertMessage = "No se pudo eliminar la cuenta"
+                                        }
+                                    return@addOnSuccessListener
+                                }
+
+                                val batch = db.batch()
+                                result.documents.forEach { doc ->
+                                    batch.update(
+                                        doc.reference,
+                                        mapOf(
+                                            "uploaderUid" to "",
+                                            "uploaderEmail" to "",
+                                            "uploaderDisplayName" to "Usuario eliminado"
+                                        )
+                                    )
+                                }
+
+                                batch.commit()
+                                    .addOnSuccessListener {
+                                        currentUser.delete()
+                                            .addOnSuccessListener {
+                                                alertMessage = "Cuenta eliminada"
+                                                onLogout()
+                                            }
+                                            .addOnFailureListener {
+                                                alertMessage = "No se pudo eliminar la cuenta"
+                                            }
+                                    }
+                                    .addOnFailureListener {
+                                        alertMessage = "No se pudieron anonimizar tus pintxos"
+                                    }
+                            }
+                            .addOnFailureListener {
+                                alertMessage = "No se pudo preparar la eliminación"
+                            }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
