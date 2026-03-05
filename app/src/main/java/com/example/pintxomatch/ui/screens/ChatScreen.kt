@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -42,6 +43,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
     var isCheckingAccess by remember { mutableStateOf(true) }
     var chatTitle by remember { mutableStateOf("Chat privado") }
     var chatIsActive by remember { mutableStateOf(true) }
+    val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     fun currentDisplayName(): String {
@@ -218,6 +220,12 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         }
     }
 
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.lastIndex)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -248,9 +256,21 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
             return@Scaffold
         }
 
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .imePadding()
+        ) {
             // LISTA DE MENSAJES
-            LazyColumn(modifier = Modifier.weight(1f).padding(16.dp)) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(bottom = 8.dp)
+            ) {
                 items(messages) { msg ->
                     val isMine = msg.senderId == auth.currentUser?.uid
                     Box(
@@ -281,7 +301,13 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
             }
 
             // BARRA DE ESCRITURA
-            Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 OutlinedTextField(
                     value = messageText,
                     onValueChange = { messageText = it },
