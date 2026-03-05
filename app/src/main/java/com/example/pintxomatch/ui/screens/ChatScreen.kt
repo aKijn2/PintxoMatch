@@ -2,11 +2,13 @@ package com.example.pintxomatch.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -17,9 +19,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.pintxomatch.data.ChatMessage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -45,8 +50,12 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
     var hasAccess by remember { mutableStateOf(false) }
     var isCheckingAccess by remember { mutableStateOf(true) }
     var chatTitle by remember { mutableStateOf("Chat privado") }
+    var participantPhotos by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var chatIsActive by remember { mutableStateOf(true) }
     var hasExited by remember { mutableStateOf(false) }
+    var showProfileDialog by remember { mutableStateOf(false) }
+    var profileDialogName by remember { mutableStateOf("Usuario") }
+    var profileDialogPhoto by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -61,6 +70,10 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         return user?.displayName?.takeIf { it.isNotBlank() }
             ?: user?.email?.substringBefore("@")
             ?: "Usuario"
+    }
+
+    fun currentPhotoUrl(): String {
+        return auth.currentUser?.photoUrl?.toString().orEmpty()
     }
 
     fun sendCurrentMessage() {
@@ -80,6 +93,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         }
 
         val senderName = currentDisplayName()
+                val senderPhoto = currentPhotoUrl()
         chatRef.get()
             .addOnSuccessListener { chatSnapshot ->
                 val canWrite = chatSnapshot.exists() &&
@@ -102,6 +116,9 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                     .addOnSuccessListener {
                         chatRef.child("updatedAt").setValue(System.currentTimeMillis())
                         chatRef.child("participantNames").child(currentUser.uid).setValue(senderName)
+                        if (senderPhoto.isNotBlank()) {
+                            chatRef.child("participantPhotos").child(currentUser.uid).setValue(senderPhoto)
+                        }
                         messageText = ""
                     }
                     .addOnFailureListener { error ->
@@ -126,12 +143,16 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                 hasAccess = snapshot.getValue(Boolean::class.java) == true
                 if (hasAccess) {
                     val name = currentDisplayName()
+                    val photoUrl = currentPhotoUrl()
                     val metadataUpdates = mapOf<String, Any>(
                         "participants/$currentUid" to true,
                         "participantNames/$currentUid" to name,
                         "updatedAt" to System.currentTimeMillis()
                     )
                     chatRef.updateChildren(metadataUpdates)
+                    if (photoUrl.isNotBlank()) {
+                        chatRef.child("participantPhotos").child(currentUid).setValue(photoUrl)
+                    }
                     chatRef.child("pintxoName").get().addOnSuccessListener { titleSnapshot ->
                         val pintxoName = titleSnapshot.getValue(String::class.java)
                         if (!pintxoName.isNullOrBlank()) {
@@ -150,12 +171,16 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
 
                         if (wroteInThisChat) {
                             val name = currentDisplayName()
+                            val photoUrl = currentPhotoUrl()
                             val metadataUpdates = mapOf<String, Any>(
                                 "participants/$currentUid" to true,
                                 "participantNames/$currentUid" to name,
                                 "updatedAt" to System.currentTimeMillis()
                             )
                             chatRef.updateChildren(metadataUpdates)
+                            if (photoUrl.isNotBlank()) {
+                                chatRef.child("participantPhotos").child(currentUid).setValue(photoUrl)
+                            }
                             chatRef.child("pintxoName").get().addOnSuccessListener { titleSnapshot ->
                                 val pintxoName = titleSnapshot.getValue(String::class.java)
                                 if (!pintxoName.isNullOrBlank()) {
@@ -205,6 +230,12 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                         exitChatOnce()
                         return
                     }
+
+                    participantPhotos = snapshot.child("participantPhotos").children.mapNotNull { photoNode ->
+                        val uid = photoNode.key
+                        val photoUrl = photoNode.getValue(String::class.java)
+                        if (uid.isNullOrBlank() || photoUrl.isNullOrBlank()) null else uid to photoUrl
+                    }.toMap()
 
                     chatIsActive = true
                 }
@@ -333,6 +364,8 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
             ) {
                 items(messages) { msg ->
                     val isMine = msg.senderId == auth.currentUser?.uid
+                    val senderPhoto = participantPhotos[msg.senderId]
+                    val senderDisplayName = if (isMine) "Tú" else msg.senderName.ifBlank { "Usuario" }
                     Box(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = if (isMine) Alignment.CenterEnd else Alignment.CenterStart
@@ -347,9 +380,18 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                                 .padding(12.dp)
                         ) {
                             Text(
-                                text = if (isMine) "Tú" else msg.senderName.ifBlank { "Usuario" },
+                                text = senderDisplayName,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isMine) Color.White else Color.DarkGray
+                                color = if (isMine) Color.White else Color.DarkGray,
+                                modifier = Modifier.clickable {
+                                    profileDialogName = if (isMine) currentDisplayName() else msg.senderName.ifBlank { "Usuario" }
+                                    profileDialogPhoto = if (isMine) {
+                                        currentPhotoUrl().takeIf { it.isNotBlank() }
+                                    } else {
+                                        senderPhoto
+                                    }
+                                    showProfileDialog = true
+                                }
                             )
                             Text(
                                 text = msg.text,
@@ -384,6 +426,53 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                 }
             }
         }
+    }
+
+    if (showProfileDialog) {
+        AlertDialog(
+            onDismissRequest = { showProfileDialog = false },
+            title = { Text("Perfil") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (!profileDialogPhoto.isNullOrBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(Color.LightGray)
+                        ) {
+                            AsyncImage(
+                                model = profileDialogPhoto,
+                                contentDescription = "Foto de perfil",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(Color.LightGray)
+                        )
+                    }
+
+                    Text(
+                        text = profileDialogName,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showProfileDialog = false }) {
+                    Text("Cerrar")
+                }
+            }
+        )
     }
 
     if (showDeleteDialog) {
