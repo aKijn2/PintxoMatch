@@ -1,33 +1,29 @@
-# 🍢 PintxoMatch - Tinder de Tortillas (Edición Gipuzkoa)
+# PintxoMatch
 
-PintxoMatch es una app Android (Kotlin + Jetpack Compose) para descubrir pintxos, hacer match y hablar por chat en tiempo real.
+PintxoMatch es una aplicación Android desarrollada con Kotlin y Jetpack Compose para descubrir pintxos, hacer match y conversar en chat en tiempo real.
 
-## ✨ Funcionalidades principales
+## Resumen funcional
 
-- **Autenticación con Firebase Auth** (registro/login con email y contraseña).
-- **Feed swipeable de pintxos** desde Firestore.
-- **Subida de pintxos sin Storage** (solo metadatos + URL externa de imagen).
-- **Chat privado 1-a-1 en Realtime Database** por match de pintxo.
-- **Panel de chats** con listado, último mensaje y borrado manual.
-- **Limpieza de chats vacíos** al volver atrás.
-- **Perfil de usuario** con edición y estadísticas de aportaciones por usuario.
+- Autenticación con Firebase Authentication (registro e inicio de sesión por email/contraseña)
+- Feed de pintxos desde Firestore con interacción por swipe
+- Publicación de pintxos usando metadatos y URL externa de imagen (sin Firebase Storage)
+- Chat privado 1 a 1 en Realtime Database
+- Panel de chats con listado, último mensaje y borrado manual
+- Perfil de usuario con edición de datos y estadísticas de aportaciones
 
----
+## Tecnologías
 
-## 🧱 Stack técnico
+- Android: Kotlin, Jetpack Compose, Navigation Compose, Material 3
+- Backend: Firebase Authentication, Cloud Firestore, Realtime Database
+- Imágenes: Coil
+- Build system: Gradle Kotlin DSL
 
-- **Android:** Kotlin, Jetpack Compose, Navigation Compose, Material 3
-- **Backend:** Firebase Authentication, Cloud Firestore, Realtime Database
-- **Imágenes:** Coil
-- **Build:** Gradle Kotlin DSL
-
----
-
-## 🗂️ Arquitectura de datos
+## Modelo de datos
 
 ### Firestore
 
 Colección `Pintxos`:
+
 - `nombre: String`
 - `bar: String`
 - `ubicacion: String`
@@ -55,62 +51,52 @@ Colección `Pintxos`:
     - `text`
     - `timestamp`
 
----
+## Flujo de chat privado
 
-## 🔐 Privacidad del chat
+- El emparejamiento se basa en `pintxoId`.
+- Un chat es visible solo para usuarios incluidos en `participants`.
+- La pantalla de chat valida acceso antes de mostrar mensajes.
+- El flujo contempla condiciones de carrera entre dispositivos y reapertura de chat existente cuando aplica.
 
-- Los chats se crean en formato **1-a-1** usando cola por `pintxoId`.
-- El listado de chats solo muestra chats donde el usuario actual es participante.
-- La pantalla de chat valida acceso por `participants/{uid}`.
-- Compatible con chats antiguos: si un usuario ya escribió en un chat viejo sin participantes, se migra su acceso.
+## Configuración local
 
----
+### Requisitos
 
-## 🚀 Puesta en marcha
+- Android Studio
+- JDK 11 o superior
+- Proyecto Firebase configurado
 
-### 1) Requisitos
-
-- Android Studio (última versión estable)
-- JDK 11+
-- Cuenta Firebase
-
-### 2) Clonar e instalar
+### Instalación
 
 ```bash
 git clone <TU_REPO>
 cd PintxoMatch
 ```
 
-### 3) Configurar Firebase
+### Firebase
 
-1. Crea proyecto en Firebase.
-2. Registra la app Android con `applicationId`:
-   - `com.example.pintxomatch`
-3. Descarga `google-services.json`.
-4. Colócalo en:
-   - `app/google-services.json`
+1. Crear proyecto en Firebase.
+2. Registrar app Android con `applicationId` `com.example.pintxomatch`.
+3. Descargar `google-services.json`.
+4. Copiarlo en `app/google-services.json`.
 
-> Nota: `google-services.json` está ignorado en git por seguridad.
+Nota: `google-services.json` está excluido del repositorio mediante `.gitignore`.
 
-### 4) Activar productos Firebase
+### Servicios necesarios en Firebase
 
-- **Authentication** → Email/Password
-- **Cloud Firestore**
-- **Realtime Database** (instancia europe-west1)
+- Authentication (Email/Password)
+- Cloud Firestore
+- Realtime Database (instancia europe-west1)
 
-### 5) Ejecutar
+## Compilación y ejecución
 
 ```bash
 ./gradlew :app:assembleDebug
 ```
 
-O desde Android Studio: **Run app**.
+También se puede ejecutar directamente desde Android Studio.
 
----
-
-## 🛡️ Reglas recomendadas (Realtime Database)
-
-> Ajusta estas reglas a tu entorno de producción. Estas son una base segura para participantes.
+## Reglas base recomendadas para Realtime Database
 
 ```json
 {
@@ -148,25 +134,7 @@ O desde Android Studio: **Run app**.
 }
 ```
 
----
+## Notas
 
-## ⚠️ Notas conocidas
-
-- Si existen pintxos antiguos sin `uploaderUid`, no contarán en estadísticas por usuario.
-- El emparejamiento usa transacción para minimizar carreras entre dispositivos.
-- El tema está forzado en modo claro para consistencia visual entre emulator y dispositivos reales.
-
----
-
-## 📌 Roadmap sugerido
-
-- Badge de chats no leídos.
-- Estado online/escribiendo.
-- Migración de documentos Firestore antiguos (`uploaderUid`).
-- Tests de integración para flujo de match y chat.
-
----
-
-## 👨‍🍳 Autoría
-
-Proyecto personal creado para validar una arquitectura de matchmaking social con coste cero de almacenamiento de imágenes.
+- Los documentos antiguos de `Pintxos` sin `uploaderUid` no computan en estadísticas por usuario.
+- El tema visual se fuerza en modo claro para mantener consistencia entre emulador y dispositivo físico.
