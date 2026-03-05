@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -16,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.pintxomatch.data.ChatMessage
 import com.google.firebase.auth.FirebaseAuth
@@ -51,6 +54,56 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         if (hasExited) return
         hasExited = true
         onNavigateBack()
+    }
+
+    fun sendCurrentMessage() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            errorMessage = "Sesión no válida. Vuelve a iniciar sesión."
+            return
+        }
+
+        val textToSend = messageText.trim()
+        if (textToSend.isBlank()) return
+
+        if (!chatIsActive || !hasAccess) {
+            errorMessage = "Este chat ya no está disponible."
+            exitChatOnce()
+            return
+        }
+
+        val senderName = currentDisplayName()
+        chatRef.get()
+            .addOnSuccessListener { chatSnapshot ->
+                val canWrite = chatSnapshot.exists() &&
+                    (chatSnapshot.child("participants").child(currentUser.uid)
+                        .getValue(Boolean::class.java) == true)
+
+                if (!canWrite) {
+                    errorMessage = "Este chat fue cerrado."
+                    exitChatOnce()
+                    return@addOnSuccessListener
+                }
+
+                val msg = ChatMessage(
+                    senderId = currentUser.uid,
+                    senderName = senderName,
+                    text = textToSend,
+                    timestamp = System.currentTimeMillis()
+                )
+                messagesRef.push().setValue(msg)
+                    .addOnSuccessListener {
+                        chatRef.child("updatedAt").setValue(System.currentTimeMillis())
+                        chatRef.child("participantNames").child(currentUser.uid).setValue(senderName)
+                        messageText = ""
+                    }
+                    .addOnFailureListener { error ->
+                        errorMessage = "No se pudo enviar: ${error.localizedMessage ?: "error desconocido"}"
+                    }
+            }
+            .addOnFailureListener {
+                errorMessage = "No se pudo validar el chat."
+            }
     }
 
     fun currentDisplayName(): String {
@@ -319,57 +372,14 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                     value = messageText,
                     onValueChange = { messageText = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Escribe un mensaje...") }
+                    placeholder = { Text("Escribe un mensaje...") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(
+                        onSend = { sendCurrentMessage() }
+                    ),
+                    maxLines = 4
                 )
-                IconButton(onClick = {
-                    val currentUser = auth.currentUser
-                    if (currentUser == null) {
-                        errorMessage = "Sesión no válida. Vuelve a iniciar sesión."
-                        return@IconButton
-                    }
-
-                    val textToSend = messageText.trim()
-                    if (textToSend.isNotBlank()) {
-                        if (!chatIsActive || !hasAccess) {
-                            errorMessage = "Este chat ya no está disponible."
-                            exitChatOnce()
-                            return@IconButton
-                        }
-
-                        val senderName = currentDisplayName()
-                        chatRef.get()
-                            .addOnSuccessListener { chatSnapshot ->
-                                val canWrite = chatSnapshot.exists() &&
-                                    (chatSnapshot.child("participants").child(currentUser.uid)
-                                        .getValue(Boolean::class.java) == true)
-
-                                if (!canWrite) {
-                                    errorMessage = "Este chat fue cerrado."
-                                    exitChatOnce()
-                                    return@addOnSuccessListener
-                                }
-
-                                val msg = ChatMessage(
-                                    senderId = currentUser.uid,
-                                    senderName = senderName,
-                                    text = textToSend,
-                                    timestamp = System.currentTimeMillis()
-                                )
-                                messagesRef.push().setValue(msg)
-                                    .addOnSuccessListener {
-                                        chatRef.child("updatedAt").setValue(System.currentTimeMillis())
-                                        chatRef.child("participantNames").child(currentUser.uid).setValue(senderName)
-                                        messageText = ""
-                                    }
-                                    .addOnFailureListener { error ->
-                                        errorMessage = "No se pudo enviar: ${error.localizedMessage ?: "error desconocido"}"
-                                    }
-                            }
-                            .addOnFailureListener {
-                                errorMessage = "No se pudo validar el chat."
-                            }
-                    }
-                }) {
+                IconButton(onClick = { sendCurrentMessage() }) {
                     Icon(Icons.Default.Send, contentDescription = "Enviar")
                 }
             }
