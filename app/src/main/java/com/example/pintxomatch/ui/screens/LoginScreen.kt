@@ -1,12 +1,14 @@
 package com.example.pintxomatch.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -29,6 +31,41 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         alertMessage?.let {
             snackbarHostState.showSnackbar(it)
             alertMessage = null
+        }
+    }
+
+    fun submitAuth() {
+        val cleanEmail = email.trim()
+        val cleanPassword = password
+            .replace("\n", "")
+            .replace("\r", "")
+
+        if (cleanEmail.isBlank() || cleanPassword.length < 6) {
+            alertMessage = "Mínimo 6 caracteres"
+            return
+        }
+
+        isLoading = true
+        if (isRegistering) {
+            auth.createUserWithEmailAndPassword(cleanEmail, cleanPassword)
+                .addOnSuccessListener {
+                    isLoading = false
+                    onLoginSuccess()
+                }
+                .addOnFailureListener {
+                    isLoading = false
+                    alertMessage = "Error: ${it.message}"
+                }
+        } else {
+            auth.signInWithEmailAndPassword(cleanEmail, cleanPassword)
+                .addOnSuccessListener {
+                    isLoading = false
+                    onLoginSuccess()
+                }
+                .addOnFailureListener {
+                    isLoading = false
+                    alertMessage = "Usuario o clave incorrectos"
+                }
         }
     }
 
@@ -57,7 +94,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 onValueChange = { email = it },
                 label = { Text("Correo electrónico") },
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next
+                )
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -68,7 +109,16 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 label = { Text("Contraseña") },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        if (!isLoading) submitAuth()
+                    }
+                )
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -77,34 +127,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 CircularProgressIndicator()
             } else {
                 Button(
-                    onClick = {
-                        if (email.isNotBlank() && password.length >= 6) {
-                            isLoading = true
-                            if (isRegistering) {
-                                auth.createUserWithEmailAndPassword(email.trim(), password)
-                                    .addOnSuccessListener {
-                                        isLoading = false
-                                        onLoginSuccess()
-                                    }
-                                    .addOnFailureListener {
-                                        isLoading = false
-                                        alertMessage = "Error: ${it.message}"
-                                    }
-                            } else {
-                                auth.signInWithEmailAndPassword(email.trim(), password)
-                                    .addOnSuccessListener {
-                                        isLoading = false
-                                        onLoginSuccess()
-                                    }
-                                    .addOnFailureListener {
-                                        isLoading = false
-                                        alertMessage = "Usuario o clave incorrectos"
-                                    }
-                            }
-                        } else {
-                            alertMessage = "Mínimo 6 caracteres"
-                        }
-                    },
+                    onClick = { submitAuth() },
                     modifier = Modifier.fillMaxWidth().height(56.dp)
                 ) {
                     Text(if (isRegistering) "Registrarse" else "Entrar")
