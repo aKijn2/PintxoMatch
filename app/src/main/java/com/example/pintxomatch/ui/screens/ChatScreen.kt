@@ -129,7 +129,18 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         messagesRef.get()
             .addOnSuccessListener { snapshot ->
                 if (!snapshot.exists() || snapshot.childrenCount == 0L) {
-                    chatRef.removeValue()
+                    chatRef.child("participants").get()
+                        .addOnSuccessListener { participantsSnapshot ->
+                            val participantCount = participantsSnapshot.childrenCount
+                            if (participantCount <= 1L) {
+                                chatRef.removeValue()
+                            }
+                            onNavigateBack()
+                        }
+                        .addOnFailureListener {
+                            onNavigateBack()
+                        }
+                    return@addOnSuccessListener
                 }
                 onNavigateBack()
             }

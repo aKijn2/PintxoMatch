@@ -37,8 +37,11 @@ import com.example.pintxomatch.ui.screens.UploadPintxoScreen
 import com.example.pintxomatch.ui.screens.UserProfileScreen
 import com.example.pintxomatch.ui.theme.PintxoMatchTheme
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.MutableData
 import com.google.firebase.database.Transaction
+import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -126,8 +129,45 @@ fun MainSwipeScreen(
 ) {
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
+    val realtimeDb = com.google.firebase.database.FirebaseDatabase
+        .getInstance("https://pintxomatch-default-rtdb.europe-west1.firebasedatabase.app")
     var pintxosFirebase by remember { mutableStateOf<List<Pintxo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var waitingPintxoId by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(waitingPintxoId, auth.currentUser?.uid) {
+        val currentUid = auth.currentUser?.uid
+        val targetPintxoId = waitingPintxoId
+
+        if (currentUid.isNullOrBlank() || targetPintxoId.isNullOrBlank()) {
+            onDispose { }
+        } else {
+            val query = realtimeDb.getReference("chats")
+                .orderByChild("pintxoId")
+                .equalTo(targetPintxoId)
+
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val myExistingChat = snapshot.children
+                        .filter { chat ->
+                            chat.child("participants").child(currentUid).getValue(Boolean::class.java) == true
+                        }
+                        .maxByOrNull { chat -> chat.child("updatedAt").getValue(Long::class.java) ?: 0L }
+
+                    val chatId = myExistingChat?.key
+                    if (!chatId.isNullOrBlank()) {
+                        waitingPintxoId = null
+                        onNavigateToChat(chatId)
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {}
+            }
+
+            query.addValueEventListener(listener)
+            onDispose { query.removeEventListener(listener) }
+        }
+    }
 
     fun currentDisplayName(): String {
         val user = auth.currentUser
@@ -136,19 +176,15 @@ fun MainSwipeScreen(
             ?: "Usuario"
     }
 
-    fun handlePrivateMatch(pintxo: Pintxo) {
-        val uid = auth.currentUser?.uid
-        if (uid.isNullOrBlank()) {
-            Toast.makeText(context, "Sesión no válida", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val db = com.google.firebase.database.FirebaseDatabase
-            .getInstance("https://pintxomatch-default-rtdb.europe-west1.firebasedatabase.app")
-        val waitingRef = db.getReference("waitingByPintxo").child(pintxo.id)
-        val chatsRef = db.getReference("chats")
-        val myName = currentDisplayName()
-
+    fun startWaitingTransaction(
+        waitingRef: com.google.firebase.database.DatabaseReference,
+        chatsRef: com.google.firebase.database.DatabaseReference,
+        uid: String,
+        myName: String,
+        pintxo: Pintxo,
+        context: android.content.Context,
+        onNavigateToChat: (String) -> Unit
+    ) {
         var matchedUid: String? = null
         var matchedName: String? = null
         var shouldWait = false
@@ -185,11 +221,35 @@ fun MainSwipeScreen(
 
                 val otherUid = matchedUid
                 if (otherUid == null || shouldWait) {
-                    Toast.makeText(
-                        context,
-                        "Esperando pareja para ${pintxo.name}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    chatsRef.orderByChild("pintxoId").equalTo(pintxo.id).get()
+                        .addOnSuccessListener { checkSnapshot ->
+                            val myExistingChat = checkSnapshot.children
+                                .filter { chat ->
+                                    chat.child("participants").child(uid).getValue(Boolean::class.java) == true
+                                }
+                                .maxByOrNull { chat -> chat.child("updatedAt").getValue(Long::class.java) ?: 0L }
+
+                            val myExistingChatId = myExistingChat?.key
+                            if (!myExistingChatId.isNullOrBlank()) {
+                                waitingPintxoId = null
+                                onNavigateToChat(myExistingChatId)
+                            } else {
+                                waitingPintxoId = pintxo.id
+                                Toast.makeText(
+                                    context,
+                                    "Esperando pareja para ${pintxo.name}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                        .addOnFailureListener {
+                            waitingPintxoId = pintxo.id
+                            Toast.makeText(
+                                context,
+                                "Esperando pareja para ${pintxo.name}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     return
                 }
 
@@ -209,6 +269,7 @@ fun MainSwipeScreen(
 
                 chatsRef.child(chatId).updateChildren(updates)
                     .addOnSuccessListener {
+                        waitingPintxoId = null
                         onNavigateToChat(chatId)
                     }
                     .addOnFailureListener {
@@ -216,6 +277,86 @@ fun MainSwipeScreen(
                     }
             }
         })
+    }
+
+    fun handlePrivateMatch(pintxo: Pintxo) {
+        val uid = auth.currentUser?.uid
+        if (uid.isNullOrBlank()) {
+            Toast.makeText(context, "Sesión no válida", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!waitingPintxoId.isNullOrBlank()) {
+            Toast.makeText(context, "Ya estás esperando pareja", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val waitingRef = realtimeDb.getReference("waitingByPintxo").child(pintxo.id)
+        val chatsRef = realtimeDb.getReference("chats")
+        val myName = currentDisplayName()
+
+        chatsRef.orderByChild("pintxoId").equalTo(pintxo.id).get()
+            .addOnSuccessListener { chatsSnapshot ->
+                val existingChat = chatsSnapshot.children
+                    .filter { chat ->
+                        chat.child("participants").child(uid).getValue(Boolean::class.java) == true
+                    }
+                    .maxByOrNull { chat -> chat.child("updatedAt").getValue(Long::class.java) ?: 0L }
+
+                val existingChatId = existingChat?.key
+                if (!existingChatId.isNullOrBlank()) {
+                    waitingPintxoId = null
+                    onNavigateToChat(existingChatId)
+                    return@addOnSuccessListener
+                }
+
+                val joinableChat = chatsSnapshot.children
+                    .firstOrNull { chat ->
+                        val participantsNode = chat.child("participants")
+                        val participantCount = participantsNode.childrenCount
+                        val iAmInChat = participantsNode.child(uid).getValue(Boolean::class.java) == true
+                        participantCount == 1L && !iAmInChat
+                    }
+
+                val joinableChatId = joinableChat?.key
+                if (!joinableChatId.isNullOrBlank()) {
+                    val joinUpdates = mapOf<String, Any>(
+                        "participants/$uid" to true,
+                        "participantNames/$uid" to myName,
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                    chatsRef.child(joinableChatId).updateChildren(joinUpdates)
+                        .addOnSuccessListener {
+                            waitingPintxoId = null
+                            onNavigateToChat(joinableChatId)
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(context, "No se pudo unir al chat", Toast.LENGTH_SHORT).show()
+                        }
+                    return@addOnSuccessListener
+                }
+
+                startWaitingTransaction(
+                    waitingRef = waitingRef,
+                    chatsRef = chatsRef,
+                    uid = uid,
+                    myName = myName,
+                    pintxo = pintxo,
+                    context = context,
+                    onNavigateToChat = onNavigateToChat
+                )
+            }
+            .addOnFailureListener {
+                startWaitingTransaction(
+                    waitingRef = waitingRef,
+                    chatsRef = chatsRef,
+                    uid = uid,
+                    myName = myName,
+                    pintxo = pintxo,
+                    context = context,
+                    onNavigateToChat = onNavigateToChat
+                )
+            }
     }
 
     // Descarga de datos de Firestore en tiempo real

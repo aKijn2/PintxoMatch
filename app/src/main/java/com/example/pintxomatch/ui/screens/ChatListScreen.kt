@@ -78,22 +78,12 @@ fun ChatListScreen(
 
                     val messagesSnapshot = chatSnapshot.child("messages")
 
-                    if (!messagesSnapshot.hasChildren()) {
-                        chatSnapshot.ref.removeValue()
-                        return@forEach
-                    }
-
                     val parsedMessages = mutableListOf<ChatMessage>()
                     messagesSnapshot.children.forEach { msgSnapshot ->
                         msgSnapshot.getValue(ChatMessage::class.java)?.let { parsedMessages.add(it) }
                     }
 
-                    if (parsedMessages.isEmpty()) {
-                        chatSnapshot.ref.removeValue()
-                        return@forEach
-                    }
-
-                    val lastMsg = parsedMessages.maxByOrNull { it.timestamp } ?: return@forEach
+                    val lastMsg = parsedMessages.maxByOrNull { it.timestamp }
                     val pintxoName = chatSnapshot.child("pintxoName").getValue(String::class.java)
                         ?: "Chat de pintxo"
                     val otherUid = chatSnapshot.child("participants").children
@@ -115,8 +105,8 @@ fun ChatListScreen(
                         ChatListItem(
                             chatId = chatId,
                             title = title,
-                            lastMessage = lastMsg.text,
-                            lastTimestamp = lastMsg.timestamp,
+                            lastMessage = lastMsg?.text ?: "Sin mensajes todavía",
+                            lastTimestamp = lastMsg?.timestamp ?: 0L,
                             messageCount = parsedMessages.size
                         )
                     )
