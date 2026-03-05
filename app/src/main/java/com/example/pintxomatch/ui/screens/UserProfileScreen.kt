@@ -1,5 +1,12 @@
 package com.example.pintxomatch.ui.screens
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,24 +23,42 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.DataOutputStream
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
     val auth = FirebaseAuth.getInstance()
     val user = auth.currentUser
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val cloudName = "dm99kc8ky"
+    val uploadPreset = "pintxomatch"
 
     // ESTADOS
     var totalPintxos by remember { mutableIntStateOf(0) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
+    var isSavingProfile by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -46,7 +71,53 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
 
     // Estados para el formulario de edición
     var nuevoNombre by remember { mutableStateOf(user?.displayName ?: "") }
-    var nuevaFotoUrl by remember { mutableStateOf(user?.photoUrl?.toString() ?: "") }
+    var selectedProfileImageUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    val pickMediaLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            selectedProfileImageUri = uri
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            selectedProfileImageUri = pendingCameraUri
+        } else {
+            pendingCameraUri = null
+            alertMessage = "No se pudo abrir o completar la cámara"
+        }
+    }
+
+    fun launchCameraCapture() {
+        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
+            alertMessage = "Este dispositivo no tiene cámara disponible"
+            return
+        }
+
+        val uri = createTempImageUriForProfile(context)
+        if (uri == null) {
+            alertMessage = "No se pudo preparar la cámara"
+            return
+        }
+
+        pendingCameraUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchCameraCapture()
+        } else {
+            alertMessage = "Permiso de cámara denegado"
+        }
+    }
 
     // Cargar estadísticas de Firestore
     LaunchedEffect(user?.uid) {
@@ -99,7 +170,9 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
         ) {
             // 1. FOTO DE PERFIL CIRCULAR
             coil.compose.AsyncImage(
-                model = user?.photoUrl ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80",
+                model = selectedProfileImageUri
+                    ?: user?.photoUrl
+                    ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80",
                 contentDescription = "Foto de perfil",
                 modifier = Modifier
                     .size(120.dp)
@@ -121,38 +194,101 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = nuevaFotoUrl,
-                    onValueChange = { nuevaFotoUrl = it },
-                    label = { Text("URL de la foto de perfil") },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("https://enlace.com/foto.jpg") }
-                )
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            pickMediaLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Galería")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val hasCameraPermission = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.CAMERA
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                            if (hasCameraPermission) {
+                                launchCameraCapture()
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cámara")
+                    }
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { isEditing = false },
+                        onClick = {
+                            isEditing = false
+                            selectedProfileImageUri = null
+                        },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Cancelar")
                     }
                     Button(
                         onClick = {
-                            val profileUpdates = userProfileChangeRequest {
-                                displayName = nuevoNombre
-                                photoUri = android.net.Uri.parse(nuevaFotoUrl)
-                            }
-                            user?.updateProfile(profileUpdates)?.addOnSuccessListener {
-                                isEditing = false
-                                alertMessage = "Perfil actualizado"
+                            coroutineScope.launch {
+                                isSavingProfile = true
+
+                                val uploadedPhotoUrl = if (selectedProfileImageUri != null) {
+                                    uploadUriToCloudinaryForProfile(
+                                        context = context,
+                                        uri = selectedProfileImageUri!!,
+                                        cloudName = cloudName,
+                                        uploadPreset = uploadPreset
+                                    )
+                                } else {
+                                    user?.photoUrl?.toString()
+                                }
+
+                                if (selectedProfileImageUri != null && uploadedPhotoUrl.isNullOrBlank()) {
+                                    isSavingProfile = false
+                                    alertMessage = "No se pudo subir la foto"
+                                    return@launch
+                                }
+
+                                val profileUpdates = userProfileChangeRequest {
+                                    displayName = nuevoNombre
+                                    if (!uploadedPhotoUrl.isNullOrBlank()) {
+                                        photoUri = Uri.parse(uploadedPhotoUrl)
+                                    }
+                                }
+
+                                user?.updateProfile(profileUpdates)?.addOnSuccessListener {
+                                    isSavingProfile = false
+                                    isEditing = false
+                                    selectedProfileImageUri = null
+                                    alertMessage = "Perfil actualizado"
+                                }?.addOnFailureListener {
+                                    isSavingProfile = false
+                                    alertMessage = "No se pudo actualizar el perfil"
+                                }
                             }
                         },
+                        enabled = !isSavingProfile,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Guardar")
+                        if (isSavingProfile) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("Guardar")
+                        }
                     }
                 }
             } else {
@@ -237,5 +373,92 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                 }
             }
         )
+    }
+}
+
+private fun createTempImageUriForProfile(context: Context): Uri? {
+    return try {
+        val tempFile = File.createTempFile(
+            "profile_${System.currentTimeMillis()}",
+            ".jpg",
+            context.cacheDir
+        )
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            tempFile
+        )
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private suspend fun uploadUriToCloudinaryForProfile(
+    context: Context,
+    uri: Uri,
+    cloudName: String,
+    uploadPreset: String
+): String? {
+    val bytes = withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+    } ?: return null
+
+    return uploadBytesToCloudinaryForProfile(
+        bytes = bytes,
+        fileName = "profile_${System.currentTimeMillis()}.jpg",
+        cloudName = cloudName,
+        uploadPreset = uploadPreset
+    )
+}
+
+private suspend fun uploadBytesToCloudinaryForProfile(
+    bytes: ByteArray,
+    fileName: String,
+    cloudName: String,
+    uploadPreset: String
+): String? = withContext(Dispatchers.IO) {
+    try {
+        val boundary = "Boundary-${UUID.randomUUID()}"
+        val url = URL("https://api.cloudinary.com/v1_1/$cloudName/image/upload")
+        val connection = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+        }
+
+        DataOutputStream(connection.outputStream).use { out ->
+            fun writeTextPart(name: String, value: String) {
+                out.writeBytes("--$boundary\r\n")
+                out.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
+                out.writeBytes(value)
+                out.writeBytes("\r\n")
+            }
+
+            writeTextPart("upload_preset", uploadPreset)
+            writeTextPart("folder", "pintxomatch/profiles")
+
+            out.writeBytes("--$boundary\r\n")
+            out.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\n")
+            out.writeBytes("Content-Type: image/jpeg\r\n\r\n")
+            out.write(bytes)
+            out.writeBytes("\r\n")
+            out.writeBytes("--$boundary--\r\n")
+            out.flush()
+        }
+
+        val responseCode = connection.responseCode
+        val response = if (responseCode in 200..299) {
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } else {
+            connection.errorStream?.bufferedReader()?.use { it.readText() }
+        }
+
+        if (responseCode !in 200..299 || response.isNullOrBlank()) {
+            null
+        } else {
+            JSONObject(response).optString("secure_url")
+        }
+    } catch (_: Exception) {
+        null
     }
 }
