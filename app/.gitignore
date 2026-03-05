@@ -1,0 +1,9 @@
+# App module build outputs
+/build/
+
+# Generated artifacts
+/release/
+/debug/
+
+# Keep Firebase config out of git (also ignored in root)
+/google-services.json

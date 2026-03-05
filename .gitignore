@@ -1,0 +1,35 @@
+# --- IntelliJ / Android Studio ---
+*.iml
+.idea/
+!.idea/.gitignore
+
+# --- VS Code ---
+.vscode/
+
+# --- Gradle / Kotlin / Android build outputs ---
+.gradle/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.hprof
+
+# --- Local machine / secrets ---
+local.properties
+keystore.properties
+*.jks
+*.keystore
+google-services.json
+
+# --- Logs ---
+*.log
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
