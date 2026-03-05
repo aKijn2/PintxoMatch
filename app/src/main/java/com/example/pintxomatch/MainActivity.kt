@@ -1,8 +1,6 @@
 package com.example.pintxomatch
 
 import android.os.Bundle
-import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -22,13 +20,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.example.pintxomatch.ui.screens.ChatListScreen
 import com.example.pintxomatch.ui.screens.ChatScreen
@@ -127,13 +125,25 @@ fun MainSwipeScreen(
     onNavigateToChat: (String) -> Unit,
     onNavigateToChatList: () -> Unit
 ) {
-    val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
     val realtimeDb = com.google.firebase.database.FirebaseDatabase
         .getInstance("https://pintxomatch-default-rtdb.europe-west1.firebasedatabase.app")
     var pintxosFirebase by remember { mutableStateOf<List<Pintxo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var waitingPintxoId by remember { mutableStateOf<String?>(null) }
+    var alertMessage by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(alertMessage) {
+        alertMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            alertMessage = null
+        }
+    }
+
+    fun notify(message: String) {
+        alertMessage = message
+    }
 
     DisposableEffect(waitingPintxoId, auth.currentUser?.uid) {
         val currentUid = auth.currentUser?.uid
@@ -182,7 +192,6 @@ fun MainSwipeScreen(
         uid: String,
         myName: String,
         pintxo: Pintxo,
-        context: android.content.Context,
         onNavigateToChat: (String) -> Unit
     ) {
         var matchedUid: String? = null
@@ -215,7 +224,7 @@ fun MainSwipeScreen(
                 currentData: com.google.firebase.database.DataSnapshot?
             ) {
                 if (error != null || !committed) {
-                    Toast.makeText(context, "No se pudo crear el match", Toast.LENGTH_SHORT).show()
+                    notify("No se pudo crear el match")
                     return
                 }
 
@@ -235,20 +244,12 @@ fun MainSwipeScreen(
                                 onNavigateToChat(myExistingChatId)
                             } else {
                                 waitingPintxoId = pintxo.id
-                                Toast.makeText(
-                                    context,
-                                    "Esperando pareja para ${pintxo.name}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                notify("Esperando pareja para ${pintxo.name}")
                             }
                         }
                         .addOnFailureListener {
                             waitingPintxoId = pintxo.id
-                            Toast.makeText(
-                                context,
-                                "Esperando pareja para ${pintxo.name}",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            notify("Esperando pareja para ${pintxo.name}")
                         }
                     return
                 }
@@ -273,7 +274,7 @@ fun MainSwipeScreen(
                         onNavigateToChat(chatId)
                     }
                     .addOnFailureListener {
-                        Toast.makeText(context, "No se pudo abrir el chat", Toast.LENGTH_SHORT).show()
+                        notify("No se pudo abrir el chat")
                     }
             }
         })
@@ -282,12 +283,12 @@ fun MainSwipeScreen(
     fun handlePrivateMatch(pintxo: Pintxo) {
         val uid = auth.currentUser?.uid
         if (uid.isNullOrBlank()) {
-            Toast.makeText(context, "Sesión no válida", Toast.LENGTH_SHORT).show()
+            notify("Sesión no válida")
             return
         }
 
         if (!waitingPintxoId.isNullOrBlank()) {
-            Toast.makeText(context, "Ya estás esperando pareja", Toast.LENGTH_SHORT).show()
+            notify("Ya estás esperando pareja")
             return
         }
 
@@ -331,7 +332,7 @@ fun MainSwipeScreen(
                             onNavigateToChat(joinableChatId)
                         }
                         .addOnFailureListener {
-                            Toast.makeText(context, "No se pudo unir al chat", Toast.LENGTH_SHORT).show()
+                            notify("No se pudo unir al chat")
                         }
                     return@addOnSuccessListener
                 }
@@ -342,7 +343,6 @@ fun MainSwipeScreen(
                     uid = uid,
                     myName = myName,
                     pintxo = pintxo,
-                    context = context,
                     onNavigateToChat = onNavigateToChat
                 )
             }
@@ -353,7 +353,6 @@ fun MainSwipeScreen(
                     uid = uid,
                     myName = myName,
                     pintxo = pintxo,
-                    context = context,
                     onNavigateToChat = onNavigateToChat
                 )
             }
@@ -381,11 +380,12 @@ fun MainSwipeScreen(
             }
             .addOnFailureListener {
                 isLoading = false
-                Log.e("Firebase", "Error cargando pintxos", it)
+                notify("Error cargando pintxos")
             }
     }
 
     Scaffold(
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("PintxoMatch 🍢", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },

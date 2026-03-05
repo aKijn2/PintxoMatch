@@ -1,6 +1,5 @@
 package com.example.pintxomatch.ui.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,20 +14,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
-    val context = LocalContext.current
-
     // VARIABLES DE ESTADO
     var nombrePintxo by remember { mutableStateOf("") }
     var nombreBar by remember { mutableStateOf("") }
@@ -36,8 +33,18 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
     var precio by remember { mutableStateOf("") }
     var imageUrl by remember { mutableStateOf("") } // El link de la foto
     var isUploading by remember { mutableStateOf(false) }
+    var alertMessage by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(alertMessage) {
+        alertMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            alertMessage = null
+        }
+    }
 
     Scaffold(
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Subir un Pintxo") },
@@ -133,15 +140,15 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
                             .add(pintxo)
                             .addOnSuccessListener {
                                 isUploading = false
-                                Toast.makeText(context, "¡Pintxo publicado!", Toast.LENGTH_SHORT).show()
+                                alertMessage = "Pintxo publicado"
                                 onNavigateBack()
                             }
                             .addOnFailureListener {
                                 isUploading = false
-                                Toast.makeText(context, "Error al subir", Toast.LENGTH_SHORT).show()
+                                alertMessage = "Error al subir"
                             }
                     } else {
-                        Toast.makeText(context, "Faltan datos clave", Toast.LENGTH_SHORT).show()
+                        alertMessage = "Faltan datos clave"
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),

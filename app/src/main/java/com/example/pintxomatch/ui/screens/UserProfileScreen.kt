@@ -1,6 +1,5 @@
 package com.example.pintxomatch.ui.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,10 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
@@ -30,12 +29,20 @@ import com.google.firebase.firestore.FirebaseFirestore
 fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
     val auth = FirebaseAuth.getInstance()
     val user = auth.currentUser
-    val context = LocalContext.current
 
     // ESTADOS
     var totalPintxos by remember { mutableIntStateOf(0) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
+    var alertMessage by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(alertMessage) {
+        alertMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            alertMessage = null
+        }
+    }
 
     // Estados para el formulario de edición
     var nuevoNombre by remember { mutableStateOf(user?.displayName ?: "") }
@@ -61,6 +68,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
     }
 
     Scaffold(
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Mi Perfil") },
@@ -139,7 +147,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                             }
                             user?.updateProfile(profileUpdates)?.addOnSuccessListener {
                                 isEditing = false
-                                Toast.makeText(context, "Perfil actualizado ✨", Toast.LENGTH_SHORT).show()
+                                alertMessage = "Perfil actualizado"
                             }
                         },
                         modifier = Modifier.weight(1f)
@@ -214,7 +222,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                 Button(
                     onClick = {
                         user?.delete()?.addOnSuccessListener {
-                            Toast.makeText(context, "Cuenta eliminada", Toast.LENGTH_SHORT).show()
+                            alertMessage = "Cuenta eliminada"
                             onLogout()
                         }
                     },
