@@ -56,6 +56,13 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         onNavigateBack()
     }
 
+    fun currentDisplayName(): String {
+        val user = auth.currentUser
+        return user?.displayName?.takeIf { it.isNotBlank() }
+            ?: user?.email?.substringBefore("@")
+            ?: "Usuario"
+    }
+
     fun sendCurrentMessage() {
         val currentUser = auth.currentUser
         if (currentUser == null) {
@@ -104,13 +111,6 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
             .addOnFailureListener {
                 errorMessage = "No se pudo validar el chat."
             }
-    }
-
-    fun currentDisplayName(): String {
-        val user = auth.currentUser
-        return user?.displayName?.takeIf { it.isNotBlank() }
-            ?: user?.email?.substringBefore("@")
-            ?: "Usuario"
     }
 
     LaunchedEffect(chatId, currentUid) {
