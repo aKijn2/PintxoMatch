@@ -215,9 +215,7 @@ fun MainSwipeScreen(
                         Toast.makeText(context, "No se pudo abrir el chat", Toast.LENGTH_SHORT).show()
                     }
             }
-        }).addOnFailureListener {
-            Toast.makeText(context, "No se pudo crear el match", Toast.LENGTH_SHORT).show()
-        }
+        })
     }
 
     // Descarga de datos de Firestore en tiempo real
