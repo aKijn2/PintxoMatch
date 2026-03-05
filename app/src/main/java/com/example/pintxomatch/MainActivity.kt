@@ -9,10 +9,9 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +30,7 @@ import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.example.pintxomatch.ui.screens.ChatListScreen
 import com.example.pintxomatch.ui.screens.ChatScreen
+import com.example.pintxomatch.ui.screens.LeaderboardScreen
 import com.example.pintxomatch.ui.screens.LoginScreen
 import com.example.pintxomatch.ui.screens.UploadPintxoScreen
 import com.example.pintxomatch.ui.screens.UserProfileScreen
@@ -82,7 +82,8 @@ class MainActivity : ComponentActivity() {
                             onNavigateToProfile = { navController.navigate("profile") },
                             onNavigateToUpload = { navController.navigate("upload") },
                             onNavigateToChat = { chatId -> navController.navigate("chat/$chatId") },
-                            onNavigateToChatList = { navController.navigate("chat_list") }
+                            onNavigateToChatList = { navController.navigate("chat_list") },
+                            onNavigateToLeaderboard = { navController.navigate("leaderboard") }
                         )
                     }
 
@@ -118,6 +119,10 @@ class MainActivity : ComponentActivity() {
                             onOpenChat = { chatId -> navController.navigate("chat/$chatId") }
                         )
                     }
+
+                    composable("leaderboard") {
+                        LeaderboardScreen(onNavigateBack = { navController.popBackStack() })
+                    }
                 }
             }
         }
@@ -130,7 +135,8 @@ fun MainSwipeScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToUpload: () -> Unit,
     onNavigateToChat: (String) -> Unit,
-    onNavigateToChatList: () -> Unit
+    onNavigateToChatList: () -> Unit,
+    onNavigateToLeaderboard: () -> Unit
 ) {
     val auth = FirebaseAuth.getInstance()
     val realtimeDb = com.google.firebase.database.FirebaseDatabase
@@ -394,14 +400,56 @@ fun MainSwipeScreen(
     Scaffold(
         snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text("PintxoMatch 🍢", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text = "PintxoMatch 🍢",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                },
                 actions = {
-                    IconButton(onClick = onNavigateToUpload) { Icon(Icons.Default.Add, "Subir", tint = MaterialTheme.colorScheme.primary) }
-                    IconButton(onClick = onNavigateToChatList) { Icon(Icons.Default.Send, "Chats", tint = MaterialTheme.colorScheme.primary) }
                     IconButton(onClick = onNavigateToProfile) { Icon(Icons.Default.Person, "Perfil") }
                 }
             )
+        },
+        bottomBar = {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
+                tonalElevation = 2.dp,
+                color = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onNavigateToUpload) {
+                            Icon(Icons.Default.Add, "Subir", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = onNavigateToLeaderboard) {
+                            Icon(Icons.Default.Star, "Ranking", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = onNavigateToChatList) {
+                            Icon(Icons.Default.Send, "Chats", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+
+                    Text(
+                        text = "Desliza ← para pasar · → para hacer match",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -454,26 +502,6 @@ fun MainSwipeScreen(
                         ) {
                             PintxoCard(pintxo = topPintxo)
                         }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 32.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    FloatingActionButton(onClick = { pintxosFirebase = pintxosFirebase.drop(1) }, containerColor = Color.White, contentColor = Color.Red) {
-                        Icon(Icons.Default.Close, "Paso", modifier = Modifier.size(36.dp))
-                    }
-                    FloatingActionButton(
-                        onClick = {
-                            val topPintxo = pintxosFirebase.firstOrNull() ?: return@FloatingActionButton
-                            handlePrivateMatch(topPintxo)
-                            pintxosFirebase = pintxosFirebase.drop(1)
-                        },
-                        containerColor = Color.White,
-                        contentColor = Color(0xFF4CAF50)
-                    ) {
-                        Icon(Icons.Default.Favorite, "Match", modifier = Modifier.size(36.dp))
                     }
                 }
             }
