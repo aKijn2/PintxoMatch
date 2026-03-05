@@ -57,7 +57,7 @@ fun PintxoCard(pintxo: Pintxo) {
                     fontSize = 16.sp
                 )
                 Text(
-                    text = "${pintxo.price} €",
+                    text = String.format("%.2f \u20ac", pintxo.price),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.primary, // Color principal de tu app

@@ -4,7 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -66,7 +71,14 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
 
                 // 2. NAVHOST ÚNICO: Gestiona todas las pantallas
-                NavHost(navController = navController, startDestination = startScreen) {
+                NavHost(
+                    navController = navController,
+                    startDestination = startScreen,
+                    enterTransition = { fadeIn(animationSpec = tween(260)) + slideInHorizontally { it / 4 } },
+                    exitTransition = { fadeOut(animationSpec = tween(200)) + slideOutHorizontally { -it / 4 } },
+                    popEnterTransition = { fadeIn(animationSpec = tween(260)) + slideInHorizontally { -it / 4 } },
+                    popExitTransition = { fadeOut(animationSpec = tween(200)) + slideOutHorizontally { it / 4 } }
+                ) {
 
                     // Pantalla de Login / Registro
                     composable("login") {
@@ -144,6 +156,8 @@ fun MainSwipeScreen(
         .getInstance("https://pintxomatch-default-rtdb.europe-west1.firebasedatabase.app")
     var pintxosFirebase by remember { mutableStateOf<List<Pintxo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val seenIds = remember { mutableStateSetOf<String>() }
     var waitingPintxoId by remember { mutableStateOf<String?>(null) }
     var waitingSecondsLeft by remember { mutableStateOf(0) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
@@ -169,12 +183,14 @@ fun MainSwipeScreen(
                         price = doc.getDouble("precio") ?: 0.0,
                         imageUrl = doc.getString("imageUrl") ?: ""
                     )
-                }
+                }.filter { it.id !in seenIds }
                 pintxosFirebase = listaNueva
                 isLoading = false
+                isRefreshing = false
             }
             .addOnFailureListener {
                 isLoading = false
+                isRefreshing = false
                 notify("Error cargando pintxos")
             }
     }
@@ -497,12 +513,47 @@ fun MainSwipeScreen(
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            if (isLoading) {
+            if (isLoading && !isRefreshing) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (pintxosFirebase.isEmpty()) {
-                Text("No hay pintxos en la nube. ¡Sé el primero!", modifier = Modifier.align(Alignment.Center))
+                // Pull-to-refresh on empty state
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = {
+                            isRefreshing = true
+                            seenIds.clear()
+                            reloadPintxos()
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No hay pintxos nuevos.\nDesliza abajo para recargar",
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
             } else {
-                Box(modifier = Modifier.fillMaxSize().padding(bottom = 100.dp), contentAlignment = Alignment.Center) {
+                // Pull-to-refresh wrapping the card stack
+                androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = {
+                        isRefreshing = true
+                        seenIds.clear()
+                        reloadPintxos()
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Box(modifier = Modifier.fillMaxSize().padding(bottom = 100.dp), contentAlignment = Alignment.Center) {
                     if (pintxosFirebase.size > 1) {
                         PintxoCard(pintxo = pintxosFirebase[1])
                     }
@@ -512,50 +563,62 @@ fun MainSwipeScreen(
                         val offsetX = remember { Animatable(0f) }
                         val offsetY = remember { Animatable(0f) }
                         val coroutineScope = rememberCoroutineScope()
+                        val springSpec = spring<Float>(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
+                        )
 
-                        Box(
-                            modifier = Modifier
-                                .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
-                                .graphicsLayer { rotationZ = offsetX.value / 20f }
-                                .pointerInput(Unit) {
-                                    detectDragGestures(
-                                        onDragEnd = {
-                                            coroutineScope.launch {
-                                                if (!waitingPintxoId.isNullOrBlank()) {
-                                                    offsetX.animateTo(0f)
-                                                    offsetY.animateTo(0f)
-                                                    notify("Ya estás esperando pareja")
-                                                    return@launch
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+
+                            Box(
+                                modifier = Modifier
+                                    .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
+                                    .graphicsLayer {
+                                        rotationZ = offsetX.value / 20f
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragEnd = {
+                                                coroutineScope.launch {
+                                                    if (!waitingPintxoId.isNullOrBlank()) {
+                                                        launch { offsetX.animateTo(0f, springSpec) }
+                                                        launch { offsetY.animateTo(0f, springSpec) }
+                                                        notify("Ya estás esperando pareja")
+                                                        return@launch
+                                                    }
+
+                                                    if (offsetX.value > 300) {
+                                                        offsetX.animateTo(1000f)
+                                                        seenIds.add(topPintxo.id)
+                                                        handlePrivateMatch(topPintxo)
+                                                        pintxosFirebase = pintxosFirebase.drop(1)
+                                                    } else if (offsetX.value < -300) {
+                                                        offsetX.animateTo(-1000f)
+                                                        seenIds.add(topPintxo.id)
+                                                        pintxosFirebase = pintxosFirebase.drop(1)
+                                                    } else {
+                                                        launch { offsetX.animateTo(0f, springSpec) }
+                                                        launch { offsetY.animateTo(0f, springSpec) }
+                                                    }
                                                 }
-
-                                                if (offsetX.value > 300) {
-                                                    offsetX.animateTo(1000f)
-                                                    handlePrivateMatch(topPintxo)
-                                                    pintxosFirebase = pintxosFirebase.drop(1)
-                                                } else if (offsetX.value < -300) {
-                                                    offsetX.animateTo(-1000f)
-                                                    pintxosFirebase = pintxosFirebase.drop(1)
-                                                } else {
-                                                    offsetX.animateTo(0f)
-                                                    offsetY.animateTo(0f)
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                if (!waitingPintxoId.isNullOrBlank()) return@detectDragGestures
+                                                coroutineScope.launch {
+                                                    offsetX.snapTo(offsetX.value + dragAmount.x)
+                                                    offsetY.snapTo(offsetY.value + dragAmount.y)
                                                 }
                                             }
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            if (!waitingPintxoId.isNullOrBlank()) return@detectDragGestures
-                                            coroutineScope.launch {
-                                                offsetX.snapTo(offsetX.value + dragAmount.x)
-                                                offsetY.snapTo(offsetY.value + dragAmount.y)
-                                            }
-                                        }
-                                    )
-                                }
-                        ) {
-                            PintxoCard(pintxo = topPintxo)
+                                        )
+                                    }
+                            ) {
+                                PintxoCard(pintxo = topPintxo)
+                            }
                         }
                     }
-                }
+                } // Box card stack
+                } // PullToRefreshBox
             }
         }
     }
