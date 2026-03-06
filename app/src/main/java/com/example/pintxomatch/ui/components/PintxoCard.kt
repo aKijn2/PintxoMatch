@@ -1,9 +1,13 @@
 package com.example.pintxomatch.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,14 +18,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pintxomatch.Pintxo
+import java.util.Locale
 
 @Composable
-fun PintxoCard(pintxo: Pintxo) {
+fun PintxoCard(
+    pintxo: Pintxo,
+    onRatePintxo: ((Int) -> Unit)? = null
+) {
     // Card es el contenedor principal que le da esa forma de "tarjeta" con sombra
     Card(
         modifier = Modifier
             .fillMaxWidth() // Ocupa todo el ancho disponible
-            .height(450.dp) // Altura de la tarjeta
+            .height(520.dp) // Altura de la tarjeta
             .padding(16.dp), // Margen exterior
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp) // Sombra
     ) {
@@ -63,6 +71,56 @@ fun PintxoCard(pintxo: Pintxo) {
                     color = MaterialTheme.colorScheme.primary, // Color principal de tu app
                     modifier = Modifier.padding(top = 8.dp)
                 )
+
+                Text(
+                    text = "Valoración general: ${String.format(Locale.US, "%.1f", pintxo.averageRating)}",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+                Text(
+                    text = if (pintxo.ratingCount == 1) {
+                        "1 reseña"
+                    } else {
+                        "${pintxo.ratingCount} reseñas"
+                    },
+                    color = Color.DarkGray,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+
+                Text(
+                    text = "Tu valoración",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+                Row(
+                    modifier = Modifier.padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    (1..5).forEach { starIndex ->
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "$starIndex estrellas",
+                            tint = if (starIndex <= pintxo.userRating) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                Color(0xFFD3D3D3)
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .then(
+                                    if (onRatePintxo != null) {
+                                        Modifier.clickable { onRatePintxo(starIndex) }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                }
             }
         }
     }

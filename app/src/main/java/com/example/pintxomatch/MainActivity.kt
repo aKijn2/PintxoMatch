@@ -46,6 +46,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.MutableData
 import com.google.firebase.database.Transaction
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
@@ -142,6 +143,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private data class RatingUpdateResult(
+    val averageRating: Double,
+    val ratingCount: Int,
+    val userRating: Int
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainSwipeScreen(
@@ -162,28 +169,53 @@ fun MainSwipeScreen(
     var waitingSecondsLeft by remember { mutableStateOf(0) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val firestore = FirebaseFirestore.getInstance()
 
     fun notify(message: String) {
         alertMessage = message
     }
 
+    fun extractRatings(snapshot: DocumentSnapshot): Map<String, Int> {
+        val rawRatings = snapshot.get("ratings") as? Map<*, *> ?: return emptyMap()
+        return rawRatings.entries.mapNotNull { (key, value) ->
+            val uid = key as? String ?: return@mapNotNull null
+            val rating = (value as? Number)?.toInt()?.coerceIn(1, 5) ?: return@mapNotNull null
+            uid to rating
+        }.toMap()
+    }
+
+    fun mapDocumentToPintxo(snapshot: DocumentSnapshot, currentUid: String?): Pintxo {
+        val ratings = extractRatings(snapshot)
+        val ratingCount = snapshot.getLong("ratingCount")?.toInt()?.coerceAtLeast(0) ?: ratings.size
+        val ratingTotal = snapshot.getDouble("ratingTotal") ?: ratings.values.sumOf { it.toDouble() }
+        val averageRating = if (ratingCount > 0) {
+            (snapshot.getDouble("averageRating") ?: (ratingTotal / ratingCount)).coerceIn(0.0, 5.0)
+        } else {
+            0.0
+        }
+
+        return Pintxo(
+            id = snapshot.id,
+            name = snapshot.getString("nombre") ?: "Sin nombre",
+            barName = snapshot.getString("bar") ?: "Bar desconocido",
+            location = snapshot.getString("ubicacion") ?: "Gipuzkoa",
+            price = snapshot.getDouble("precio") ?: 0.0,
+            imageUrl = snapshot.getString("imageUrl") ?: "",
+            averageRating = averageRating,
+            ratingCount = ratingCount,
+            userRating = currentUid?.let { ratings[it] } ?: 0
+        )
+    }
+
     fun reloadPintxos() {
         isLoading = true
-        val db = FirebaseFirestore.getInstance()
-        db.collection("Pintxos")
+        val currentUid = auth.currentUser?.uid
+        firestore.collection("Pintxos")
             .orderBy(FieldPath.documentId())
             .get()
             .addOnSuccessListener { result ->
-                val listaNueva = result.map { doc ->
-                    Pintxo(
-                        id = doc.id,
-                        name = doc.getString("nombre") ?: "Sin nombre",
-                        barName = doc.getString("bar") ?: "Bar desconocido",
-                        location = doc.getString("ubicacion") ?: "Gipuzkoa",
-                        price = doc.getDouble("precio") ?: 0.0,
-                        imageUrl = doc.getString("imageUrl") ?: ""
-                    )
-                }.filter { it.id !in seenIds }
+                val listaNueva = result.map { doc -> mapDocumentToPintxo(doc, currentUid) }
+                    .filter { it.id !in seenIds }
                 pintxosFirebase = listaNueva
                 isLoading = false
                 isRefreshing = false
@@ -193,6 +225,66 @@ fun MainSwipeScreen(
                 isRefreshing = false
                 notify("Error cargando pintxos")
             }
+    }
+
+    fun submitRating(pintxo: Pintxo, stars: Int) {
+        val uid = auth.currentUser?.uid
+        if (uid.isNullOrBlank()) {
+            notify("Inicia sesión para valorar")
+            return
+        }
+
+        val newRating = stars.coerceIn(1, 5)
+        val docRef = firestore.collection("Pintxos").document(pintxo.id)
+
+        firestore.runTransaction { transaction ->
+            val snapshot = transaction.get(docRef)
+            val existingRatings = extractRatings(snapshot)
+            val previousRating = existingRatings[uid] ?: 0
+            val baseCount = snapshot.getLong("ratingCount")?.toInt()?.coerceAtLeast(0)
+                ?: existingRatings.size
+            val baseTotal = snapshot.getDouble("ratingTotal")
+                ?: existingRatings.values.sumOf { it.toDouble() }
+
+            val ratingCount = if (previousRating == 0) baseCount + 1 else baseCount
+            val ratingTotal = if (previousRating == 0) {
+                baseTotal + newRating.toDouble()
+            } else {
+                baseTotal - previousRating.toDouble() + newRating.toDouble()
+            }
+            val averageRating = if (ratingCount > 0) ratingTotal / ratingCount else 0.0
+
+            transaction.update(
+                docRef,
+                mapOf(
+                    "ratings.$uid" to newRating,
+                    "ratingCount" to ratingCount,
+                    "ratingTotal" to ratingTotal,
+                    "averageRating" to averageRating
+                )
+            )
+
+            RatingUpdateResult(
+                averageRating = averageRating,
+                ratingCount = ratingCount,
+                userRating = newRating
+            )
+        }.addOnSuccessListener { updatedRating ->
+            pintxosFirebase = pintxosFirebase.map { currentPintxo ->
+                if (currentPintxo.id == pintxo.id) {
+                    currentPintxo.copy(
+                        averageRating = updatedRating.averageRating,
+                        ratingCount = updatedRating.ratingCount,
+                        userRating = updatedRating.userRating
+                    )
+                } else {
+                    currentPintxo
+                }
+            }
+            notify("Valoración guardada")
+        }.addOnFailureListener {
+            notify("No se pudo guardar la valoración")
+        }
     }
 
     LaunchedEffect(alertMessage) {
@@ -613,7 +705,10 @@ fun MainSwipeScreen(
                                         )
                                     }
                             ) {
-                                PintxoCard(pintxo = topPintxo)
+                                PintxoCard(
+                                    pintxo = topPintxo,
+                                    onRatePintxo = { stars -> submitRating(topPintxo, stars) }
+                                )
                             }
                         }
                     }

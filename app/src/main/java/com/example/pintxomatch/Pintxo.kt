@@ -7,5 +7,8 @@ data class Pintxo(
     val barName: String,       // Ej: "Bar Txepetxa"
     val location: String,      // Ej: "Parte Vieja, Donostia"
     val price: Double,         // Ej: 2.50
-    val imageUrl: String       // Aquí irá la foto del pintxo
+    val imageUrl: String,      // Aquí irá la foto del pintxo
+    val averageRating: Double = 0.0,
+    val ratingCount: Int = 0,
+    val userRating: Int = 0
 )
