@@ -755,18 +755,16 @@ private fun MapStageCard(
                                 SummaryPill(text = "1 elegido")
                             }
                         }
-
-                        selectedRestaurant?.let { restaurant ->
-                            MiniSelectedRestaurantOverlay(
-                                restaurant = restaurant,
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(12.dp),
-                                onSelectOnMap = { onSelectOnMap(restaurant) },
-                                onOpenDirections = { onOpenDirections(restaurant) }
-                            )
-                        }
                     }
+                }
+
+                selectedRestaurant?.let { restaurant ->
+                    MiniSelectedRestaurantOverlay(
+                        restaurant = restaurant,
+                        modifier = Modifier.fillMaxWidth(),
+                        onSelectOnMap = { onSelectOnMap(restaurant) },
+                        onOpenDirections = { onOpenDirections(restaurant) }
+                    )
                 }
             }
         }
@@ -863,36 +861,52 @@ private fun MiniSelectedRestaurantOverlay(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(0.58f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Text(
+                text = "Seleccionado",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.ExtraBold
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = restaurant.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "${normalizeRestaurantCategory(restaurant.category)} · ${formatDistance(restaurant.distanceMeters)}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = restaurant.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${normalizeRestaurantCategory(restaurant.category)} · ${formatDistance(restaurant.distanceMeters)}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                TextButton(onClick = onSelectOnMap) {
-                    Text("Ver")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilledTonalButton(onClick = onSelectOnMap) {
+                    Text("Centrar")
                 }
                 FilledTonalButton(onClick = onOpenDirections) {
                     Text("Ruta")
@@ -952,22 +966,26 @@ private fun NearbyBrowserPanel(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(0.78f),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = "Destacados cerca de ti",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp
+                        fontSize = 22.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Text(
                         text = "Desliza las tarjetas para descubrir más opciones sin perder el foco.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }
             }
