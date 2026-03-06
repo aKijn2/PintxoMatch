@@ -30,9 +30,13 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,6 +61,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
     // ESTADOS
     var totalPintxos by remember { mutableIntStateOf(0) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var deletePassword by remember { mutableStateOf("") }
     var isEditing by remember { mutableStateOf(false) }
     var isSavingProfile by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
@@ -351,65 +356,96 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
     // DIÁLOGO DE CONFIRMACIÓN
     if (showDeleteDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = { 
+                showDeleteDialog = false 
+                deletePassword = ""
+            },
             title = { Text("¿Deseas marcharte?") },
-            text = { Text("Esta acción es irreversible. Se borrarán tus datos de acceso pero tus pintxos compartidos seguirán ayudando a otros.") },
+            text = { 
+                Column {
+                    Text("Esta acción es irreversible. Se borrarán tus datos de acceso pero tus pintxos compartidos seguirán ayudando a otros. Introduce tu contraseña para confirmar:")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = deletePassword,
+                        onValueChange = { deletePassword = it },
+                        label = { Text("Contraseña") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         val currentUser = user
                         val uid = currentUser?.uid
-                        if (currentUser == null || uid.isNullOrBlank()) {
+                        val email = currentUser?.email
+                        if (currentUser == null || uid.isNullOrBlank() || email.isNullOrBlank()) {
                             alertMessage = "No se pudo validar la cuenta"
                             return@Button
                         }
+                        if (deletePassword.isBlank()) {
+                            alertMessage = "Introduce tu contraseña para continuar"
+                            return@Button
+                        }
 
-                        val db = FirebaseFirestore.getInstance()
-                        db.collection("Pintxos")
-                            .whereEqualTo("uploaderUid", uid)
-                            .get()
-                            .addOnSuccessListener { result ->
-                                if (result.isEmpty) {
-                                    currentUser.delete()
-                                        .addOnSuccessListener {
-                                            alertMessage = "Cuenta eliminada"
-                                            onLogout()
+                        // 1. Re-autenticar al usuario
+                        val credential = EmailAuthProvider.getCredential(email, deletePassword)
+                        currentUser.reauthenticate(credential)
+                            .addOnSuccessListener {
+                                // 2. Anonimizar o borrar pintxos
+                                val db = FirebaseFirestore.getInstance()
+                                db.collection("Pintxos")
+                                    .whereEqualTo("uploaderUid", uid)
+                                    .get()
+                                    .addOnSuccessListener { result ->
+                                        if (result.isEmpty) {
+                                            currentUser.delete()
+                                                .addOnSuccessListener {
+                                                    alertMessage = "Cuenta eliminada"
+                                                    onLogout()
+                                                }
+                                                .addOnFailureListener {
+                                                    alertMessage = "No se pudo eliminar la cuenta: ${it.localizedMessage}"
+                                                }
+                                            return@addOnSuccessListener
                                         }
-                                        .addOnFailureListener {
-                                            alertMessage = "No se pudo eliminar la cuenta"
+
+                                        val batch = db.batch()
+                                        result.documents.forEach { doc ->
+                                            batch.update(
+                                                doc.reference,
+                                                mapOf(
+                                                    "uploaderUid" to "",
+                                                    "uploaderEmail" to "",
+                                                    "uploaderDisplayName" to "Usuario eliminado"
+                                                )
+                                            )
                                         }
-                                    return@addOnSuccessListener
-                                }
 
-                                val batch = db.batch()
-                                result.documents.forEach { doc ->
-                                    batch.update(
-                                        doc.reference,
-                                        mapOf(
-                                            "uploaderUid" to "",
-                                            "uploaderEmail" to "",
-                                            "uploaderDisplayName" to "Usuario eliminado"
-                                        )
-                                    )
-                                }
-
-                                batch.commit()
-                                    .addOnSuccessListener {
-                                        currentUser.delete()
+                                        batch.commit()
                                             .addOnSuccessListener {
-                                                alertMessage = "Cuenta eliminada"
-                                                onLogout()
+                                                // 3. Borrar la cuenta en Auth después de proteger los datos
+                                                currentUser.delete()
+                                                    .addOnSuccessListener {
+                                                        alertMessage = "Cuenta eliminada"
+                                                        onLogout()
+                                                    }
+                                                    .addOnFailureListener {
+                                                        alertMessage = "No se pudo eliminar la cuenta: ${it.localizedMessage}"
+                                                    }
                                             }
                                             .addOnFailureListener {
-                                                alertMessage = "No se pudo eliminar la cuenta"
+                                                alertMessage = "No se pudieron anonimizar tus pintxos"
                                             }
                                     }
                                     .addOnFailureListener {
-                                        alertMessage = "No se pudieron anonimizar tus pintxos"
+                                        alertMessage = "No se pudo preparar la eliminación"
                                     }
                             }
                             .addOnFailureListener {
-                                alertMessage = "No se pudo preparar la eliminación"
+                                alertMessage = "Contraseña incorrecta o error de re-autenticación"
                             }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
@@ -418,7 +454,10 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
+                TextButton(onClick = { 
+                    showDeleteDialog = false 
+                    deletePassword = ""
+                }) {
                     Text("Seguir aquí")
                 }
             }
