@@ -12,6 +12,7 @@ PintxoMatch es una aplicación Android desarrollada con Kotlin y Jetpack Compose
 - Panel de chats con listado, último mensaje y borrado manual
 - Perfil de usuario con edición de datos y estadísticas de aportaciones
 - Leaderboard con ranking de usuarios por aportaciones y pintxos mejor valorados
+- Sección de restaurantes cercanos con mapa integrado y ubicación actual
 
 ## Tecnologías
 
@@ -71,6 +72,7 @@ Colección `Pintxos`:
 - Android Studio
 - JDK 11 o superior
 - Proyecto Firebase configurado
+- Permiso de ubicación en el dispositivo o emulador para la sección de restaurantes cercanos
 
 ### Instalación
 

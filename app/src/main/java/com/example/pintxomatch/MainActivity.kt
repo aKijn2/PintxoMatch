@@ -14,6 +14,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
@@ -37,6 +38,7 @@ import com.example.pintxomatch.ui.screens.ChatListScreen
 import com.example.pintxomatch.ui.screens.ChatScreen
 import com.example.pintxomatch.ui.screens.LeaderboardScreen
 import com.example.pintxomatch.ui.screens.LoginScreen
+import com.example.pintxomatch.ui.screens.NearbyRestaurantsScreen
 import com.example.pintxomatch.ui.screens.UploadPintxoScreen
 import com.example.pintxomatch.ui.screens.UserProfileScreen
 import com.example.pintxomatch.ui.theme.PintxoMatchTheme
@@ -97,7 +99,8 @@ class MainActivity : ComponentActivity() {
                             onNavigateToUpload = { navController.navigate("upload") },
                             onNavigateToChat = { chatId -> navController.navigate("chat/$chatId") },
                             onNavigateToChatList = { navController.navigate("chat_list") },
-                            onNavigateToLeaderboard = { navController.navigate("leaderboard") }
+                            onNavigateToLeaderboard = { navController.navigate("leaderboard") },
+                            onNavigateToNearby = { navController.navigate("nearby_restaurants") }
                         )
                     }
 
@@ -137,6 +140,10 @@ class MainActivity : ComponentActivity() {
                     composable("leaderboard") {
                         LeaderboardScreen(onNavigateBack = { navController.popBackStack() })
                     }
+
+                    composable("nearby_restaurants") {
+                        NearbyRestaurantsScreen(onNavigateBack = { navController.popBackStack() })
+                    }
                 }
             }
         }
@@ -156,7 +163,8 @@ fun MainSwipeScreen(
     onNavigateToUpload: () -> Unit,
     onNavigateToChat: (String) -> Unit,
     onNavigateToChatList: () -> Unit,
-    onNavigateToLeaderboard: () -> Unit
+    onNavigateToLeaderboard: () -> Unit,
+    onNavigateToNearby: () -> Unit
 ) {
     val auth = FirebaseAuth.getInstance()
     val realtimeDb = com.google.firebase.database.FirebaseDatabase
@@ -585,6 +593,9 @@ fun MainSwipeScreen(
                         }
                         IconButton(onClick = onNavigateToLeaderboard) {
                             Icon(Icons.Default.Star, "Ranking", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = onNavigateToNearby) {
+                            Icon(Icons.Default.Place, "Cerca de ti", tint = MaterialTheme.colorScheme.primary)
                         }
                         IconButton(onClick = onNavigateToChatList) {
                             Icon(Icons.Default.Send, "Chats", tint = MaterialTheme.colorScheme.primary)
