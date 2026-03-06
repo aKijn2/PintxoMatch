@@ -1,57 +1,58 @@
 # PintxoMatch
 
-PintxoMatch es una aplicación Android desarrollada con Kotlin y Jetpack Compose para descubrir pintxos, hacer match y conversar en chat en tiempo real.
+PintxoMatch is an Android application built with Kotlin and Jetpack Compose to discover pintxos, rate them, match with other users, and continue the experience through private chat.
 
-## Resumen funcional
+## Overview
 
-- Autenticación con Firebase Authentication (registro e inicio de sesión por email/contraseña)
-- Feed de pintxos desde Firestore con interacción por swipe
-- Valoraciones con estrellas por usuario y media global visible para todos
-- Publicación de pintxos usando metadatos y URL externa de imagen (sin Firebase Storage)
-- Chat privado 1 a 1 en Realtime Database
-- Panel de chats con listado, último mensaje y borrado manual
-- Perfil de usuario con edición de datos y estadísticas de aportaciones
-- Leaderboard con ranking de usuarios por aportaciones y pintxos mejor valorados
-- Sección de restaurantes cercanos con mapa integrado y ubicación actual
+PintxoMatch combines food discovery, lightweight social interaction, and location-based exploration in a single mobile experience. Users can browse pintxos, publish new entries, rate them individually while seeing a shared community average, chat with matched users, compare user rankings, and view nearby places on an integrated map.
 
-## Capturas
+## Core Features
 
-### Galería
+- Email and password authentication with Firebase Authentication.
+- Swipe-based pintxo discovery feed backed by Cloud Firestore.
+- Per-user star ratings with shared average score and review counts.
+- Pintxo publishing flow based on metadata and external image URLs.
+- One-to-one private chat using Firebase Realtime Database.
+- Chat inbox with latest message preview and manual cleanup.
+- User profile with editable information and contribution stats.
+- Ranking view for top contributors and best-rated pintxos.
+- Nearby places screen with current location, map view, filters, and Google Maps routing.
 
-![Captura 1](img/Screenshot_20260306_132808.png)
+## Interface Preview
 
-![Captura 2](img/Screenshot_20260306_132855.png)
+<p align="center">
+  <img src="img/Screenshot_20260306_132808.png" alt="PintxoMatch screen 1" width="180" />
+  <img src="img/Screenshot_20260306_132855.png" alt="PintxoMatch screen 2" width="180" />
+  <img src="img/Screenshot_20260306_132903.png" alt="PintxoMatch screen 3" width="180" />
+  <img src="img/Screenshot_20260306_132926.png" alt="PintxoMatch screen 4" width="180" />
+</p>
 
-![Captura 3](img/Screenshot_20260306_132903.png)
+<p align="center">
+  <img src="img/Screenshot_20260306_133117.png" alt="PintxoMatch screen 5" width="180" />
+  <img src="img/Screenshot_20260306_133124.png" alt="PintxoMatch screen 6" width="180" />
+  <img src="img/Screenshot_20260306_133137.png" alt="PintxoMatch screen 7" width="180" />
+  <img src="img/Screenshot_20260306_133154.png" alt="PintxoMatch screen 8" width="180" />
+</p>
 
-![Captura 4](img/Screenshot_20260306_132926.png)
+<p align="center">
+  <img src="img/Screenshot_20260306_133207.png" alt="PintxoMatch screen 9" width="180" />
+  <img src="img/Screenshot_20260306_133220.png" alt="PintxoMatch screen 10" width="180" />
+  <img src="img/Screenshot_20260306_133407.png" alt="PintxoMatch screen 11" width="180" />
+</p>
 
-![Captura 5](img/Screenshot_20260306_133117.png)
+## Technology Stack
 
-![Captura 6](img/Screenshot_20260306_133124.png)
+- Android UI: Kotlin, Jetpack Compose, Navigation Compose, Material 3.
+- Backend: Firebase Authentication, Cloud Firestore, Firebase Realtime Database.
+- Image loading: Coil.
+- Mapping: osmdroid with OpenStreetMap tiles.
+- Build configuration: Gradle Kotlin DSL.
 
-![Captura 7](img/Screenshot_20260306_133137.png)
+## Data Model
 
-![Captura 8](img/Screenshot_20260306_133154.png)
+### Cloud Firestore
 
-![Captura 9](img/Screenshot_20260306_133207.png)
-
-![Captura 10](img/Screenshot_20260306_133220.png)
-
-![Captura 11](img/Screenshot_20260306_133407.png)
-
-## Tecnologías
-
-- Android: Kotlin, Jetpack Compose, Navigation Compose, Material 3
-- Backend: Firebase Authentication, Cloud Firestore, Realtime Database
-- Imágenes: Coil
-- Build system: Gradle Kotlin DSL
-
-## Modelo de datos
-
-### Firestore
-
-Colección `Pintxos`:
+Collection `Pintxos`:
 
 - `nombre: String`
 - `bar: String`
@@ -66,7 +67,7 @@ Colección `Pintxos`:
 - `ratingTotal: Double`
 - `averageRating: Double`
 
-### Realtime Database
+### Firebase Realtime Database
 
 - `waitingByPintxo/{pintxoId}/{uid}`
   - `displayName`
@@ -84,53 +85,53 @@ Colección `Pintxos`:
     - `text`
     - `timestamp`
 
-## Flujo de chat privado
+## Chat Model
 
-- El emparejamiento se basa en `pintxoId`.
-- Un chat es visible solo para usuarios incluidos en `participants`.
-- La pantalla de chat valida acceso antes de mostrar mensajes.
-- El flujo contempla condiciones de carrera entre dispositivos y reapertura de chat existente cuando aplica.
+- Matching is keyed by `pintxoId`.
+- A chat is accessible only to users present in `participants`.
+- The chat screen validates access before displaying messages.
+- The flow accounts for race conditions and reopening an existing chat when appropriate.
 
-## Configuración local
+## Local Setup
 
-### Requisitos
+### Requirements
 
-- Android Studio
-- JDK 11 o superior
-- Proyecto Firebase configurado
-- Permiso de ubicación en el dispositivo o emulador para la sección de restaurantes cercanos
+- Android Studio.
+- JDK 11 or newer.
+- A configured Firebase project.
+- Location permission enabled on the device or emulator to use the nearby places feature.
 
-### Instalación
+### Clone the Repository
 
 ```bash
-git clone <TU_REPO>
+git clone <YOUR_REPOSITORY_URL>
 cd PintxoMatch
 ```
 
-### Firebase
+### Firebase Configuration
 
-1. Crear proyecto en Firebase.
-2. Registrar app Android con `applicationId` `com.example.pintxomatch`.
-3. Descargar `google-services.json`.
-4. Copiarlo en `app/google-services.json`.
+1. Create a Firebase project.
+2. Register an Android application with package name `com.example.pintxomatch`.
+3. Download `google-services.json`.
+4. Place the file in `app/google-services.json`.
 
-Nota: `google-services.json` está excluido del repositorio mediante `.gitignore`.
+`google-services.json` should remain excluded from version control.
 
-### Servicios necesarios en Firebase
+### Required Firebase Services
 
-- Authentication (Email/Password)
-- Cloud Firestore
-- Realtime Database (instancia europe-west1)
+- Authentication with Email/Password.
+- Cloud Firestore.
+- Firebase Realtime Database.
 
-## Compilación y ejecución
+## Build and Run
 
 ```bash
 ./gradlew :app:assembleDebug
 ```
 
-También se puede ejecutar directamente desde Android Studio.
+You can also run the project directly from Android Studio.
 
-## Reglas base recomendadas para Realtime Database
+## Recommended Realtime Database Rules
 
 ```json
 {
@@ -168,7 +169,7 @@ También se puede ejecutar directamente desde Android Studio.
 }
 ```
 
-## Notas
+## Notes
 
-- Los documentos antiguos de `Pintxos` sin `uploaderUid` no computan en estadísticas por usuario.
-- El tema visual se fuerza en modo claro para mantener consistencia entre emulador y dispositivo físico.
+- Older `Pintxos` documents without `uploaderUid` do not count toward user contribution statistics.
+- The app currently forces a light theme for visual consistency across emulator and physical devices.
