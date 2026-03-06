@@ -1,10 +1,18 @@
 # PintxoMatch
 
-PintxoMatch is an Android application built with Kotlin and Jetpack Compose to discover pintxos, rate them, match with other users, and continue the experience through private chat.
+PintxoMatch is an Android application built with Kotlin and Jetpack Compose to discover pintxos, rate them, connect with other users, and continue the experience through private chat and nearby venue exploration.
 
 ## Overview
 
-PintxoMatch combines food discovery, lightweight social interaction, and location-based exploration in a single mobile experience. Users can browse pintxos, publish new entries, rate them individually while seeing a shared community average, chat with matched users, compare user rankings, and view nearby places on an integrated map.
+PintxoMatch combines food discovery, lightweight social interaction, and location-based exploration in a single mobile product. Users can browse pintxos, publish new entries, rate them individually while seeing a shared community average, open private chats after a match, compare rankings, and explore nearby places on an integrated map.
+
+## Product Scope
+
+The project is organized around three main product areas:
+
+- Pintxo discovery through a swipe-based browsing experience.
+- Social interaction through ratings, matches, and one-to-one chat.
+- Nearby venue exploration with route handoff to Google Maps.
 
 ## Core Features
 
@@ -24,21 +32,15 @@ PintxoMatch combines food discovery, lightweight social interaction, and locatio
   <img src="img/Screenshot_20260306_132808.png" alt="PintxoMatch screen 1" width="180" />
   <img src="img/Screenshot_20260306_132855.png" alt="PintxoMatch screen 2" width="180" />
   <img src="img/Screenshot_20260306_132903.png" alt="PintxoMatch screen 3" width="180" />
-  <img src="img/Screenshot_20260306_132926.png" alt="PintxoMatch screen 4" width="180" />
 </p>
 
 <p align="center">
+  <img src="img/Screenshot_20260306_132926.png" alt="PintxoMatch screen 4" width="180" />
   <img src="img/Screenshot_20260306_133117.png" alt="PintxoMatch screen 5" width="180" />
   <img src="img/Screenshot_20260306_133124.png" alt="PintxoMatch screen 6" width="180" />
-  <img src="img/Screenshot_20260306_133137.png" alt="PintxoMatch screen 7" width="180" />
-  <img src="img/Screenshot_20260306_133154.png" alt="PintxoMatch screen 8" width="180" />
 </p>
 
-<p align="center">
-  <img src="img/Screenshot_20260306_133207.png" alt="PintxoMatch screen 9" width="180" />
-  <img src="img/Screenshot_20260306_133220.png" alt="PintxoMatch screen 10" width="180" />
-  <img src="img/Screenshot_20260306_133407.png" alt="PintxoMatch screen 11" width="180" />
-</p>
+Additional screenshots remain available in the `img/` directory for extended reference.
 
 ## Technology Stack
 
@@ -47,6 +49,14 @@ PintxoMatch combines food discovery, lightweight social interaction, and locatio
 - Image loading: Coil.
 - Mapping: osmdroid with OpenStreetMap tiles.
 - Build configuration: Gradle Kotlin DSL.
+
+## Project Structure
+
+- `app/src/main/java/com/example/pintxomatch/`: application source code.
+- `app/src/main/res/`: Android resources.
+- `app/google-services.json`: Firebase Android configuration.
+- `img/`: screenshots used in the project documentation.
+- `gradle/` and root Gradle files: dependency and build configuration.
 
 ## Data Model
 
