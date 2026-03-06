@@ -2,17 +2,22 @@ package com.example.pintxomatch.ui.screens
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.drawable.GradientDrawable
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
+import android.view.MotionEvent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,10 +26,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
@@ -37,6 +44,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -53,8 +61,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -70,11 +80,14 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint as OsmGeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polygon
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.net.URL
 import java.util.Locale
+import kotlin.math.roundToInt
+import org.json.JSONException
 
 private data class GeoPoint(
     val latitude: Double,
@@ -91,7 +104,32 @@ private data class NearbyRestaurant(
     val distanceMeters: Int
 )
 
+private data class RestaurantMapSelection(
+    val restaurantId: String,
+    val centerMapOnSelection: Boolean = false
+)
+
 private class NearbyRestaurantsException(message: String) : IOException(message)
+
+private class GestureAwareMapView(context: Context) : MapView(context) {
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN,
+            MotionEvent.ACTION_MOVE,
+            MotionEvent.ACTION_POINTER_DOWN,
+            MotionEvent.ACTION_POINTER_UP -> {
+                parent?.requestDisallowInterceptTouchEvent(true)
+            }
+
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+            }
+        }
+
+        return super.onTouchEvent(event)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,14 +139,35 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
         context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     }
     val snackbarHostState = remember { SnackbarHostState() }
+    val nearbyResultsCache = remember { mutableMapOf<String, List<NearbyRestaurant>>() }
 
-    var selectedRadius by remember { mutableIntStateOf(10000) }
+    var selectedRadius by remember { mutableIntStateOf(1000) }
     var userLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var restaurants by remember { mutableStateOf<List<NearbyRestaurant>>(emptyList()) }
+    var selectedRestaurant by remember { mutableStateOf<NearbyRestaurant?>(null) }
+    var restaurantMapSelection by remember { mutableStateOf<RestaurantMapSelection?>(null) }
     var isLocationLoading by remember { mutableStateOf(false) }
     var isPlacesLoading by remember { mutableStateOf(false) }
     var hasLocationPermission by remember { mutableStateOf(context.hasLocationPermission()) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
+    var selectedCategory by remember { mutableStateOf("Todos") }
+    var showAllRestaurants by remember { mutableStateOf(false) }
+
+    val availableCategories = remember(restaurants) {
+        listOf("Todos") + restaurants
+            .map { normalizeRestaurantCategory(it.category) }
+            .distinct()
+            .sorted()
+    }
+    val filteredRestaurants = remember(restaurants, selectedCategory) {
+        restaurants.filter { restaurant ->
+            selectedCategory == "Todos" ||
+                normalizeRestaurantCategory(restaurant.category) == selectedCategory
+        }
+    }
+    val visibleRestaurants = remember(filteredRestaurants, showAllRestaurants) {
+        if (showAllRestaurants) filteredRestaurants else filteredRestaurants.take(6)
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -150,32 +209,39 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
 
     LaunchedEffect(userLocation, selectedRadius) {
         val currentLocation = userLocation ?: return@LaunchedEffect
+        val cacheKey = buildNearbyCacheKey(currentLocation, selectedRadius)
+        nearbyResultsCache[cacheKey]?.let { cachedRestaurants ->
+            restaurants = cachedRestaurants
+            return@LaunchedEffect
+        }
+
         isPlacesLoading = true
         runCatching {
-            val primaryResults = fetchNearbyRestaurants(
+            fetchNearbyRestaurants(
                 latitude = currentLocation.latitude,
                 longitude = currentLocation.longitude,
                 radiusMeters = selectedRadius
             )
-            if (primaryResults.isNotEmpty() || selectedRadius >= 25000) {
-                primaryResults
-            } else {
-                fetchNearbyRestaurants(
-                    latitude = currentLocation.latitude,
-                    longitude = currentLocation.longitude,
-                    radiusMeters = 25000
-                )
-            }
         }.onSuccess { fetched ->
             restaurants = fetched
-            if (fetched.isNotEmpty() && selectedRadius < 25000 && fetched.none { it.distanceMeters <= selectedRadius }) {
-                alertMessage = "No había sitios en tu radio inicial. Ampliamos la búsqueda hasta 25 km."
+            nearbyResultsCache[cacheKey] = fetched
+            if (selectedRestaurant != null) {
+                selectedRestaurant = fetched.firstOrNull { it.id == selectedRestaurant?.id }
             }
         }.onFailure { throwable ->
             restaurants = emptyList()
+            selectedRestaurant = null
             alertMessage = throwable.message ?: "No se pudieron cargar los restaurantes cercanos"
         }
         isPlacesLoading = false
+    }
+
+    LaunchedEffect(selectedCategory, restaurants) {
+        showAllRestaurants = false
+        if (selectedRestaurant != null && filteredRestaurants.none { it.id == selectedRestaurant?.id }) {
+            selectedRestaurant = null
+            restaurantMapSelection = null
+        }
     }
 
     Scaffold(
@@ -220,110 +286,178 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
                 .padding(padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item {
-                    Card(
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = "Descubre dónde seguir el plan",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Usamos tu ubicación para enseñarte restaurantes, bares y cafeterías cercanas directamente sobre el mapa.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                listOf(1000, 5000, 10000, 25000).forEach { radius ->
-                                    FilterChip(
-                                        selected = selectedRadius == radius,
-                                        onClick = { selectedRadius = radius },
-                                        label = {
-                                            Text(
-                                                if (radius >= 1000) {
-                                                    String.format(Locale.US, "%.0f km", radius / 1000f)
-                                                } else {
-                                                    "${radius} m"
-                                                }
-                                            )
-                                        }
-                                    )
-                                }
+                        Text(
+                            text = "Descubre dónde seguir el plan",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Usamos tu ubicación para enseñarte restaurantes, bares y cafeterías cercanas directamente sobre el mapa.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(500, 1000, 3000).forEach { radius ->
+                                FilterChip(
+                                    selected = selectedRadius == radius,
+                                    onClick = { selectedRadius = radius },
+                                    label = {
+                                        Text(
+                                            if (radius >= 1000) {
+                                                String.format(Locale.US, "%.0f km", radius / 1000f)
+                                            } else {
+                                                "${radius} m"
+                                            }
+                                        )
+                                    }
+                                )
                             }
                         }
                     }
                 }
 
                 if (!hasLocationPermission) {
-                    item {
-                        PermissionCard(
-                            onRequestPermission = {
-                                permissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
+                    PermissionCard(
+                        onRequestPermission = {
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
                                 )
-                            }
-                        )
-                    }
+                            )
+                        }
+                    )
                 } else {
-                    item {
-                        LocationSummaryCard(
-                            userLocation = userLocation,
-                            radiusMeters = selectedRadius,
-                            isLocationLoading = isLocationLoading,
-                            onLocateMe = {
-                                requestCurrentLocation(
+                    LocationSummaryCard(
+                        userLocation = userLocation,
+                        radiusMeters = selectedRadius,
+                        isLocationLoading = isLocationLoading,
+                        onLocateMe = {
+                            requestCurrentLocation(
+                                context = context,
+                                locationManager = locationManager,
+                                onLoadingChanged = { isLocationLoading = it },
+                                onLocationFound = { userLocation = it },
+                                onError = { alertMessage = it }
+                            )
+                        }
+                    )
+
+                    MapSectionCard(
+                        userLocation = userLocation,
+                        restaurants = filteredRestaurants,
+                        selectedRestaurantId = restaurantMapSelection?.restaurantId,
+                        centerOnRestaurantId = restaurantMapSelection?.takeIf { it.centerMapOnSelection }?.restaurantId,
+                        isLoading = isLocationLoading || isPlacesLoading,
+                        onRestaurantSelected = { restaurant ->
+                            selectedRestaurant = restaurant
+                            restaurantMapSelection = RestaurantMapSelection(
+                                restaurantId = restaurant.id,
+                                centerMapOnSelection = false
+                            )
+                        },
+                        onCenteredSelectionHandled = {
+                            restaurantMapSelection = restaurantMapSelection?.copy(centerMapOnSelection = false)
+                        }
+                    )
+
+                    selectedRestaurant?.let { restaurant ->
+                        SelectedRestaurantCard(
+                            restaurant = restaurant,
+                            onOpenDirections = {
+                                openDirections(
                                     context = context,
-                                    locationManager = locationManager,
-                                    onLoadingChanged = { isLocationLoading = it },
-                                    onLocationFound = { userLocation = it },
-                                    onError = { alertMessage = it }
+                                    restaurant = restaurant,
+                                    userLocation = userLocation
                                 )
                             }
                         )
                     }
 
-                    item {
-                        MapSectionCard(
-                            userLocation = userLocation,
-                            restaurants = restaurants,
-                            isLoading = isLocationLoading || isPlacesLoading
+                    SectionHeader(
+                        title = "Locales cercanos",
+                        subtitle = if (selectedCategory == "Todos") {
+                            "Ordenados por distancia desde tu ubicación"
+                        } else {
+                            "Filtrados por $selectedCategory"
+                        }
+                    )
+
+                    RestaurantFilterRow(
+                        categories = availableCategories,
+                        selectedCategory = selectedCategory,
+                        onCategorySelected = { selectedCategory = it }
+                    )
+
+                    if (filteredRestaurants.isNotEmpty()) {
+                        ResultSummaryCard(
+                            visibleCount = visibleRestaurants.size,
+                            totalCount = filteredRestaurants.size,
+                            isExpanded = showAllRestaurants,
+                            onToggleExpanded = {
+                                showAllRestaurants = !showAllRestaurants
+                            }
                         )
                     }
 
-                    item {
-                        SectionHeader(
-                            title = "Locales cercanos",
-                            subtitle = "Ordenados por distancia desde tu ubicación"
-                        )
-                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                    ) {
+                        when {
+                            isPlacesLoading && filteredRestaurants.isEmpty() -> {
+                                LoadingCard(message = "Buscando restaurantes cerca de ti...")
+                            }
 
-                    if (isPlacesLoading && restaurants.isEmpty()) {
-                        item {
-                            LoadingCard(message = "Buscando restaurantes cerca de ti...")
-                        }
-                    } else if (restaurants.isEmpty()) {
-                        item {
-                            EmptyPlacesCard()
-                        }
-                    } else {
-                        items(restaurants) { restaurant ->
-                            NearbyRestaurantCard(restaurant = restaurant)
+                            filteredRestaurants.isEmpty() -> {
+                                EmptyPlacesCard()
+                            }
+
+                            else -> {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    visibleRestaurants.forEach { restaurant ->
+                                        NearbyRestaurantCard(
+                                            restaurant = restaurant,
+                                            isSelected = selectedRestaurant?.id == restaurant.id,
+                                            onSelect = {
+                                                selectedRestaurant = restaurant
+                                                restaurantMapSelection = RestaurantMapSelection(
+                                                    restaurantId = restaurant.id,
+                                                    centerMapOnSelection = true
+                                                )
+                                            },
+                                            onOpenDirections = {
+                                                selectedRestaurant = restaurant
+                                                openDirections(
+                                                    context = context,
+                                                    restaurant = restaurant,
+                                                    userLocation = userLocation
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -382,7 +516,7 @@ private fun LocationSummaryCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(0.8f),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -434,9 +568,34 @@ private fun LocationSummaryCard(
 private fun MapSectionCard(
     userLocation: GeoPoint?,
     restaurants: List<NearbyRestaurant>,
-    isLoading: Boolean
+    selectedRestaurantId: String?,
+    centerOnRestaurantId: String?,
+    isLoading: Boolean,
+    onRestaurantSelected: (NearbyRestaurant) -> Unit,
+    onCenteredSelectionHandled: () -> Unit
 ) {
     val context = LocalContext.current
+    val primaryColorArgb = MaterialTheme.colorScheme.primary.toArgb()
+    val mapSignature = remember(userLocation, restaurants, selectedRestaurantId, centerOnRestaurantId) {
+        buildString {
+            append(userLocation?.latitude)
+            append('|')
+            append(userLocation?.longitude)
+            append('|')
+            append(selectedRestaurantId)
+            append('|')
+            append(centerOnRestaurantId)
+            append('|')
+            restaurants.forEach { restaurant ->
+                append(restaurant.id)
+                append(':')
+                append(restaurant.latitude)
+                append(':')
+                append(restaurant.longitude)
+                append(';')
+            }
+        }
+    }
     Card(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -462,10 +621,12 @@ private fun MapSectionCard(
             } else {
                 val mapView = remember {
                     Configuration.getInstance().userAgentValue = context.packageName
-                    MapView(context).apply {
+                    GestureAwareMapView(context).apply {
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         controller.setZoom(14.5)
+                        isHorizontalMapRepetitionEnabled = false
+                        isVerticalMapRepetitionEnabled = false
                     }
                 }
 
@@ -475,46 +636,97 @@ private fun MapSectionCard(
                     }
                 }
 
-                AndroidView(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(320.dp),
-                    factory = { mapView },
-                    update = { osmMap ->
-                        osmMap.overlays.clear()
-                        osmMap.controller.setCenter(
-                            OsmGeoPoint(userLocation.latitude, userLocation.longitude)
-                        )
-
-                        val userMarker = Marker(osmMap).apply {
-                            position = OsmGeoPoint(userLocation.latitude, userLocation.longitude)
-                            title = "Estás aquí"
-                            snippet = "Tu ubicación actual"
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        }
-                        osmMap.overlays.add(userMarker)
-
-                        restaurants.forEach { restaurant ->
-                            val marker = Marker(osmMap).apply {
-                                position = OsmGeoPoint(restaurant.latitude, restaurant.longitude)
-                                title = restaurant.name
-                                snippet = buildString {
-                                    append(restaurant.category)
-                                    if (restaurant.address.isNotBlank()) {
-                                        append("\n")
-                                        append(restaurant.address)
-                                    }
-                                    append("\n")
-                                    append(formatDistance(restaurant.distanceMeters))
-                                }
-                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { mapView },
+                        update = { osmMap ->
+                            if (osmMap.getTag() == mapSignature) {
+                                return@AndroidView
                             }
-                            osmMap.overlays.add(marker)
-                        }
 
-                        osmMap.invalidate()
-                    },
-                )
+                            osmMap.setTag(mapSignature)
+                            osmMap.overlays.clear()
+                            val selectedRestaurant = restaurants.firstOrNull { it.id == selectedRestaurantId }
+                            val centeredRestaurant = restaurants.firstOrNull { it.id == centerOnRestaurantId }
+                            val centerTarget = centeredRestaurant ?: selectedRestaurant
+                            osmMap.controller.setCenter(
+                                OsmGeoPoint(
+                                    centerTarget?.latitude ?: userLocation.latitude,
+                                    centerTarget?.longitude ?: userLocation.longitude
+                                )
+                            )
+                            if (centeredRestaurant != null) {
+                                osmMap.controller.animateTo(
+                                    OsmGeoPoint(centeredRestaurant.latitude, centeredRestaurant.longitude)
+                                )
+                                onCenteredSelectionHandled()
+                            }
+
+                            val userHalo = Polygon().apply {
+                                points = Polygon.pointsAsCircle(
+                                    OsmGeoPoint(userLocation.latitude, userLocation.longitude),
+                                    85.0
+                                )
+                                fillColor = android.graphics.Color.argb(90, 211, 47, 47)
+                                strokeColor = android.graphics.Color.rgb(211, 47, 47)
+                                strokeWidth = 2f
+                                title = "Estás aquí"
+                            }
+                            osmMap.overlays.add(userHalo)
+
+                            val userCore = Polygon().apply {
+                                points = Polygon.pointsAsCircle(
+                                    OsmGeoPoint(userLocation.latitude, userLocation.longitude),
+                                    22.0
+                                )
+                                fillColor = android.graphics.Color.argb(240, 211, 47, 47)
+                                strokeColor = android.graphics.Color.WHITE
+                                strokeWidth = 5f
+                                title = "Estás aquí"
+                            }
+                            osmMap.overlays.add(userCore)
+
+                            restaurants.forEach { restaurant ->
+                                val marker = Marker(osmMap).apply {
+                                    position = OsmGeoPoint(restaurant.latitude, restaurant.longitude)
+                                    title = restaurant.name
+                                    snippet = buildString {
+                                        append(restaurant.category)
+                                        if (restaurant.address.isNotBlank()) {
+                                            append("\n")
+                                            append(restaurant.address)
+                                        }
+                                        append("\n")
+                                        append(formatDistance(restaurant.distanceMeters))
+                                    }
+                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    icon = buildRestaurantMarkerDrawable(
+                                        context = context,
+                                        isSelected = restaurant.id == selectedRestaurant?.id,
+                                        primaryColor = primaryColorArgb
+                                    )
+                                    setOnMarkerClickListener { clickedMarker, _ ->
+                                        clickedMarker.showInfoWindow()
+                                        onRestaurantSelected(restaurant)
+                                        true
+                                    }
+                                }
+                                osmMap.overlays.add(marker)
+                            }
+
+                            osmMap.invalidate()
+                        },
+                    )
+                }
             }
         }
     }
@@ -557,80 +769,331 @@ private fun EmptyPlacesCard() {
         ) {
             Text(text = "Nada cerca por ahora", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Text(
-                text = "Prueba a ampliar el radio o actualiza tu ubicación para buscar otra vez.",
+                text = "Prueba a cambiar el filtro, ampliar el radio o actualizar tu ubicación para buscar otra vez.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NearbyRestaurantCard(restaurant: NearbyRestaurant) {
+private fun RestaurantFilterRow(
+    categories: List<String>,
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit
+) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(categories) { category ->
+            FilterChip(
+                selected = selectedCategory == category,
+                onClick = { onCategorySelected(category) },
+                label = { Text(category) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResultSummaryCard(
+    visibleCount: Int,
+    totalCount: Int,
+    isExpanded: Boolean,
+    onToggleExpanded: () -> Unit
+) {
     Card(
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Text(
+                text = if (isExpanded || totalCount <= visibleCount) {
+                    "$totalCount locales visibles"
+                } else {
+                    "Mostrando $visibleCount de $totalCount"
+                },
+                fontWeight = FontWeight.SemiBold
+            )
+
+            if (totalCount > 6) {
+                TextButton(onClick = onToggleExpanded) {
+                    Text(if (isExpanded) "Ver menos" else "Ver todos")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectedRestaurantCard(
+    restaurant: NearbyRestaurant,
+    onOpenDirections: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                Column(modifier = Modifier.fillMaxWidth(0.72f)) {
+                    Text(
+                        text = restaurant.name,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = restaurant.address.ifBlank { restaurant.category },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
 
-                Column {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                ) {
                     Text(
-                        text = restaurant.name,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp
-                    )
-                    Text(
-                        text = restaurant.category,
+                        text = formatDistance(restaurant.distanceMeters),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodySmall
+                        fontWeight = FontWeight.Bold
                     )
-                    if (restaurant.address.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = restaurant.address,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CategoryChip(text = restaurant.category)
+                Text(
+                    text = "Restaurante seleccionado",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
 
-            Text(
-                text = formatDistance(restaurant.distanceMeters),
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            TextButton(onClick = onOpenDirections) {
+                Text("Como llegar en Maps")
+            }
         }
     }
+}
+
+@Composable
+private fun NearbyRestaurantCard(
+    restaurant: NearbyRestaurant,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onOpenDirections: () -> Unit
+) {
+    Card(
+        modifier = Modifier.clickable(onClick = onSelect),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(0.76f),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(
+                                if (isSelected) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                } else {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                },
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = restaurant.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        CategoryChip(text = restaurant.category)
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                ) {
+                    Text(
+                        text = formatDistance(restaurant.distanceMeters),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            if (restaurant.address.isNotBlank()) {
+                Text(
+                    text = restaurant.address,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onSelect) {
+                    Text(if (isSelected) "Seleccionado" else "Ver en el mapa")
+                }
+
+                TextButton(onClick = onOpenDirections) {
+                    Text("Como llegar")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryChip(text: String) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            color = MaterialTheme.colorScheme.tertiary,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+private fun buildRestaurantMarkerDrawable(
+    context: Context,
+    isSelected: Boolean,
+    primaryColor: Int
+): GradientDrawable {
+    return GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        val markerSizePx = if (isSelected) dpToPx(context, 44) else dpToPx(context, 36)
+        val strokeWidthPx = if (isSelected) dpToPx(context, 6) else dpToPx(context, 3)
+        setSize(
+            markerSizePx,
+            markerSizePx
+        )
+        setColor(if (isSelected) primaryColor else android.graphics.Color.WHITE)
+        setStroke(strokeWidthPx, primaryColor)
+    }
+}
+
+private fun openDirections(
+    context: Context,
+    restaurant: NearbyRestaurant,
+    userLocation: GeoPoint?
+) {
+    val destination = "${restaurant.latitude},${restaurant.longitude}"
+    val origin = userLocation?.let { "${it.latitude},${it.longitude}" }
+
+    val googleMapsUri = Uri.parse(
+        buildString {
+            append("google.navigation:q=")
+            append(destination)
+            append("&mode=w")
+        }
+    )
+
+    val googleMapsIntent = Intent(Intent.ACTION_VIEW, googleMapsUri).apply {
+        `package` = "com.google.android.apps.maps"
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    val browserUri = Uri.parse(
+        buildString {
+            append("https://www.google.com/maps/dir/?api=1")
+            if (origin != null) {
+                append("&origin=")
+                append(Uri.encode(origin))
+            }
+            append("&destination=")
+            append(Uri.encode(destination))
+            append("&travelmode=walking")
+        }
+    )
+
+    val browserIntent = Intent(Intent.ACTION_VIEW, browserUri).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    try {
+        if (googleMapsIntent.resolveActivity(context.packageManager) != null) {
+            context.startActivity(googleMapsIntent)
+        } else {
+            context.startActivity(browserIntent)
+        }
+    } catch (_: ActivityNotFoundException) {
+    }
+}
+
+private fun dpToPx(context: Context, value: Int): Int {
+    return (value * context.resources.displayMetrics.density).roundToInt()
+}
+
+private fun normalizeRestaurantCategory(category: String): String {
+    val normalized = category.trim().replaceFirstChar { char ->
+        if (char.isLowerCase()) char.titlecase(Locale.getDefault()) else char.toString()
+    }
+
+    return if (normalized.isBlank()) "Otros" else normalized
 }
 
 private fun Context.hasLocationPermission(): Boolean {
@@ -705,17 +1168,29 @@ private suspend fun fetchNearbyRestaurants(
     radiusMeters: Int
 ): List<NearbyRestaurant> = withContext(Dispatchers.IO) {
     val query = """
-        [out:json][timeout:25];
-        (
-                    node["amenity"~"restaurant|bar|pub|cafe"](around:$radiusMeters,$latitude,$longitude);
-                    way["amenity"~"restaurant|bar|pub|cafe"](around:$radiusMeters,$latitude,$longitude);
-                    relation["amenity"~"restaurant|bar|pub|cafe"](around:$radiusMeters,$latitude,$longitude);
-        );
-        out center;
+        [out:json][timeout:12];
+        nwr["amenity"~"restaurant|bar|pub|cafe"]["name"](around:$radiusMeters,$latitude,$longitude);
+        out tags center qt;
     """.trimIndent()
 
     val response = requestOverpass(query)
-    val json = JSONObject(response)
+    val normalizedResponse = response.trimStart()
+    if (!normalizedResponse.startsWith("{")) {
+        val preview = normalizedResponse.take(120).replace('\n', ' ')
+        throw NearbyRestaurantsException(
+            if (preview.isBlank()) {
+                "El servicio de restaurantes devolvió una respuesta vacía"
+            } else {
+                "El servicio de restaurantes devolvió una respuesta no válida: $preview"
+            }
+        )
+    }
+
+    val json = try {
+        JSONObject(normalizedResponse)
+    } catch (exception: JSONException) {
+        throw NearbyRestaurantsException("No pudimos interpretar la respuesta del servicio de restaurantes")
+    }
     val elements = json.getJSONArray("elements")
     val results = mutableListOf<NearbyRestaurant>()
 
@@ -785,8 +1260,8 @@ private fun requestOverpass(query: String): String {
         try {
             val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
-                connectTimeout = 15000
-                readTimeout = 20000
+                connectTimeout = 8000
+                readTimeout = 12000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
                 setRequestProperty("Accept", "application/json")
@@ -814,7 +1289,14 @@ private fun requestOverpass(query: String): String {
             lastError = when (statusCode) {
                 429 -> "El servicio de mapas está saturado ahora mismo. Prueba otra vez en unos segundos."
                 in 500..599 -> "El servicio de restaurantes cercanos no responde bien en este momento."
-                else -> "No pudimos consultar restaurantes cercanos ahora mismo."
+                else -> {
+                    val preview = body.trim().take(120).replace('\n', ' ')
+                    if (preview.isBlank()) {
+                        "No pudimos consultar restaurantes cercanos ahora mismo."
+                    } else {
+                        "Respuesta no válida del servicio de restaurantes: $preview"
+                    }
+                }
             }
         } catch (exception: Exception) {
             lastError = exception.message ?: "Fallo de red consultando locales cercanos"
@@ -834,5 +1316,14 @@ private fun formatDistance(distanceMeters: Int): String {
 
 private fun formatCoordinate(value: Double): String {
     return String.format(Locale.US, "%.4f", value)
+}
+
+private fun buildNearbyCacheKey(
+    userLocation: GeoPoint,
+    radiusMeters: Int
+): String {
+    val latitudeBucket = (userLocation.latitude * 1000).roundToInt()
+    val longitudeBucket = (userLocation.longitude * 1000).roundToInt()
+    return "$radiusMeters:$latitudeBucket:$longitudeBucket"
 }
 
