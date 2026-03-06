@@ -14,6 +14,32 @@ PintxoMatch es una aplicación Android desarrollada con Kotlin y Jetpack Compose
 - Leaderboard con ranking de usuarios por aportaciones y pintxos mejor valorados
 - Sección de restaurantes cercanos con mapa integrado y ubicación actual
 
+## Capturas
+
+### Galería
+
+![Captura 1](img/Screenshot_20260306_132808.png)
+
+![Captura 2](img/Screenshot_20260306_132855.png)
+
+![Captura 3](img/Screenshot_20260306_132903.png)
+
+![Captura 4](img/Screenshot_20260306_132926.png)
+
+![Captura 5](img/Screenshot_20260306_133117.png)
+
+![Captura 6](img/Screenshot_20260306_133124.png)
+
+![Captura 7](img/Screenshot_20260306_133137.png)
+
+![Captura 8](img/Screenshot_20260306_133154.png)
+
+![Captura 9](img/Screenshot_20260306_133207.png)
+
+![Captura 10](img/Screenshot_20260306_133220.png)
+
+![Captura 11](img/Screenshot_20260306_133407.png)
+
 ## Tecnologías
 
 - Android: Kotlin, Jetpack Compose, Navigation Compose, Material 3
