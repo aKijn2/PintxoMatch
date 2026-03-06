@@ -233,15 +233,20 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
                                     Text(text = medal, fontWeight = FontWeight.Bold)
                                 }
                                 Spacer(modifier = Modifier.size(10.dp))
+
+                                val displayName = user.displayName.replaceFirstChar { it.uppercase() }
+
                                 Text(
-                                    text = user.displayName,
+                                    text = displayName,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 16.sp
                                 )
                             }
 
+                            val label = if (user.totalUploads == 1) "Pintxo" else "Pintxos"
+
                             Text(
-                                text = "${user.totalUploads} pintxos",
+                                text = "${user.totalUploads} $label",
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
