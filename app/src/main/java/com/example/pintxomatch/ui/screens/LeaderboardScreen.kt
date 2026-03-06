@@ -53,6 +53,14 @@ data class LeaderboardUser(
     val totalUploads: Int
 )
 
+data class LeaderboardPintxo(
+    val id: String,
+    val name: String,
+    val barName: String,
+    val averageRating: Double,
+    val ratingCount: Int
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaderboardScreen(onNavigateBack: () -> Unit) {
@@ -60,6 +68,7 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
     val currentUid = auth.currentUser?.uid
 
     var users by remember { mutableStateOf<List<LeaderboardUser>>(emptyList()) }
+    var topRatedPintxos by remember { mutableStateOf<List<LeaderboardPintxo>>(emptyList()) }
     var myRank by remember { mutableStateOf<Int?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
@@ -96,7 +105,37 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
                     }
                     .sortedByDescending { it.totalUploads }
 
+                val ratingsLeaderboard = result.documents.mapNotNull { doc ->
+                    val rawRatings = doc.get("ratings") as? Map<*, *>
+                    val fallbackRatings = rawRatings?.values
+                        ?.mapNotNull { (it as? Number)?.toInt()?.coerceIn(1, 5) }
+                        .orEmpty()
+                    val ratingCount = doc.getLong("ratingCount")?.toInt()?.coerceAtLeast(0)
+                        ?: fallbackRatings.size
+                    if (ratingCount <= 0) {
+                        return@mapNotNull null
+                    }
+
+                    val ratingTotal = doc.getDouble("ratingTotal")
+                        ?: fallbackRatings.sumOf { it.toDouble() }
+                    val averageRating = (doc.getDouble("averageRating")
+                        ?: (ratingTotal / ratingCount)).coerceIn(0.0, 5.0)
+
+                    LeaderboardPintxo(
+                        id = doc.id,
+                        name = doc.getString("nombre") ?: "Sin nombre",
+                        barName = doc.getString("bar") ?: "Bar desconocido",
+                        averageRating = averageRating,
+                        ratingCount = ratingCount
+                    )
+                }.sortedWith(
+                    compareByDescending<LeaderboardPintxo> { it.averageRating }
+                        .thenByDescending { it.ratingCount }
+                        .thenBy { it.name.lowercase() }
+                )
+
                 users = leaderboard
+                topRatedPintxos = ratingsLeaderboard
                 myRank = leaderboard.indexOfFirst { it.uid == currentUid }
                     .takeIf { it != -1 }
                     ?.plus(1)
@@ -131,14 +170,14 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (users.isEmpty()) {
+            } else if (users.isEmpty() && topRatedPintxos.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Aún no hay aportaciones para el ranking")
+                    Text("Aún no hay datos suficientes para el ranking")
                 }
             } else {
 
@@ -190,74 +229,193 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
                 }
             }
 
-            itemsIndexed(users.take(30)) { index, user ->
-                val medal = when (index) {
-                    0 -> "1"
-                    1 -> "2"
-                    2 -> "3"
-                    else -> "#${index + 1}"
-                }
+            if (users.isNotEmpty()) {
+                itemsIndexed(users.take(30)) { index, user ->
+                    val medal = when (index) {
+                        0 -> "1"
+                        1 -> "2"
+                        2 -> "3"
+                        else -> "#${index + 1}"
+                    }
 
-                val progress = (user.totalUploads.toFloat() / topCount.toFloat()).coerceIn(0f, 1f)
+                    val progress = (user.totalUploads.toFloat() / topCount.toFloat()).coerceIn(0f, 1f)
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (index < 3) {
-                            MaterialTheme.colorScheme.secondaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .background(
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                            shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(text = medal, fontWeight = FontWeight.Bold)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (index < 3) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .background(
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                                shape = CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = medal, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.size(10.dp))
+
+                                    val displayName = user.displayName.replaceFirstChar { it.uppercase() }
+
+                                    Text(
+                                        text = displayName,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 16.sp
+                                    )
                                 }
-                                Spacer(modifier = Modifier.size(10.dp))
 
-                                val displayName = user.displayName.replaceFirstChar { it.uppercase() }
+                                val label = if (user.totalUploads == 1) "Pintxo" else "Pintxos"
 
                                 Text(
-                                    text = displayName,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 16.sp
+                                    text = "${user.totalUploads} $label",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
 
-                            val label = if (user.totalUploads == 1) "Pintxo" else "Pintxos"
-
-                            Text(
-                                text = "${user.totalUploads} $label",
-                                fontWeight = FontWeight.Bold,
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp),
+                                trackColor = Color.LightGray,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
+                    }
+                }
+            }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp),
-                            trackColor = Color.LightGray,
-                            color = MaterialTheme.colorScheme.primary
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Star, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = "Pintxos mejor valorados",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                        }
+                        Text(
+                            text = "Se ordenan por nota media y, en empate, por número de reseñas",
+                            style = MaterialTheme.typography.bodyMedium
                         )
+                    }
+                }
+            }
+
+            if (topRatedPintxos.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Text(
+                            text = "Todavía no hay pintxos valorados.",
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+            } else {
+                itemsIndexed(topRatedPintxos.take(20)) { index, pintxo ->
+                    val medal = when (index) {
+                        0 -> "1"
+                        1 -> "2"
+                        2 -> "3"
+                        else -> "#${index + 1}"
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (index < 3) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .background(
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                                shape = CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(text = medal, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.size(10.dp))
+                                    Column {
+                                        Text(
+                                            text = pintxo.name,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 16.sp
+                                        )
+                                        Text(
+                                            text = pintxo.barName,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = String.format("%.1f", pintxo.averageRating),
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = if (pintxo.ratingCount == 1) "1 reseña" else "${pintxo.ratingCount} reseñas",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

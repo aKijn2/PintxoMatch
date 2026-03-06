@@ -11,6 +11,7 @@ PintxoMatch es una aplicación Android desarrollada con Kotlin y Jetpack Compose
 - Chat privado 1 a 1 en Realtime Database
 - Panel de chats con listado, último mensaje y borrado manual
 - Perfil de usuario con edición de datos y estadísticas de aportaciones
+- Leaderboard con ranking de usuarios por aportaciones y pintxos mejor valorados
 
 ## Tecnologías
 
