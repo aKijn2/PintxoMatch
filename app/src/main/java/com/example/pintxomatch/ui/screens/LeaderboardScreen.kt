@@ -108,8 +108,8 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
             }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Leaderboard") },
@@ -121,29 +121,26 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
             )
         }
     ) { padding ->
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-            return@Scaffold
-        }
-
-        if (users.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Aún no hay aportaciones para el ranking")
-            }
-            return@Scaffold
-        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else if (users.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Aún no hay aportaciones para el ranking")
+                }
+            } else {
 
         val topCount = users.firstOrNull()?.totalUploads?.coerceAtLeast(1) ?: 1
 
@@ -264,6 +261,16 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
                     }
                 }
             }
-        }
+            } // Close the 'else' block containing LazyColumn
+            
+        } // Close Box
+    }
+    AppSnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.TopCenter)
+    )
+    } // end outer Box
     }
 }
+
+

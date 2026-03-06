@@ -64,22 +64,23 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 }
                 .addOnFailureListener {
                     isLoading = false
-                    alertMessage = "Usuario o clave incorrectos"
+                    alertMessage = "Correo o contraseña incorrectos"
                 }
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
             Text(
                 text = if (isRegistering) "Crear cuenta" else "Bienvenido",
                 fontSize = 32.sp,
@@ -138,5 +139,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 }
             }
         }
+            
+        }
     }
+    AppSnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.TopCenter)
+    )
+    } // end outer Box
 }

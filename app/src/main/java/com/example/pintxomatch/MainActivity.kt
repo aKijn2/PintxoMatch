@@ -453,8 +453,8 @@ fun MainSwipeScreen(
         reloadPintxos()
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -620,6 +620,13 @@ fun MainSwipeScreen(
                 } // Box card stack
                 } // PullToRefreshBox
             }
+            
         }
     }
+    AppSnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.TopCenter)
+    )
+    } // end outer Box
 }
+

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.pintxomatch.data.ChatMessage
+import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -317,6 +318,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -332,20 +334,19 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                     }
                 }
             )
-        },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { padding ->
-        if (isCheckingAccess) {
-            Box(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-            return@Scaffold
         }
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isCheckingAccess) {
+                Box(
+                    modifier = Modifier
+                        .padding(padding)
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
 
         Column(
             modifier = Modifier
@@ -426,7 +427,12 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                 }
             }
         }
+            } // Close if (isCheckingAccess) else block
+            
+        }
     }
+    AppSnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.TopCenter))
+    } // end outer Box
 
     if (showProfileDialog) {
         AlertDialog(

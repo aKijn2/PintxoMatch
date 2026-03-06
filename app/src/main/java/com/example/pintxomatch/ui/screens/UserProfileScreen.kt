@@ -143,8 +143,8 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Mi Perfil") },
@@ -165,14 +165,15 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()), // Permite scroll al editar
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()), // Permite scroll al editar
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             // 1. FOTO DE PERFIL CIRCULAR
             coil.compose.AsyncImage(
                 model = selectedProfileImageUri
@@ -248,6 +249,16 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                     }
                     Button(
                         onClick = {
+                            val trimmedName = nuevoNombre.trim()
+                            if (trimmedName.isEmpty()) {
+                                alertMessage = "El nombre no puede estar vacío"
+                                return@Button
+                            }
+                            if (!trimmedName.matches(Regex("^[a-zA-Z0-9 ]+$"))) {
+                                alertMessage = "El nombre solo puede contener letras y números"
+                                return@Button
+                            }
+
                             coroutineScope.launch {
                                 isSavingProfile = true
 
@@ -269,7 +280,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                                 }
 
                                 val profileUpdates = userProfileChangeRequest {
-                                    displayName = nuevoNombre
+                                    displayName = trimmedName
                                     if (!uploadedPhotoUrl.isNullOrBlank()) {
                                         photoUri = Uri.parse(uploadedPhotoUrl)
                                     }
@@ -280,6 +291,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                                     isEditing = false
                                     selectedProfileImageUri = null
                                     alertMessage = "Perfil actualizado"
+                                    nuevoNombre = trimmedName
                                 }?.addOnFailureListener {
                                     isSavingProfile = false
                                     alertMessage = "No se pudo actualizar el perfil"
@@ -324,7 +336,9 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp).fillMaxWidth(),
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text("Aportaciones a la Comunidad", fontSize = 16.sp)
@@ -351,7 +365,14 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                 Text("Eliminar mi cuenta definitivamente")
             }
         }
+        
+        }
     }
+    AppSnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.TopCenter)
+    )
+    } // end outer Box
 
     // DIÁLOGO DE CONFIRMACIÓN
     if (showDeleteDialog) {

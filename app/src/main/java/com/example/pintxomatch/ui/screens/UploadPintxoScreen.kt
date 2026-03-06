@@ -115,8 +115,8 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Subir un Pintxo") },
@@ -128,14 +128,15 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             // 1. VISTA PREVIA DE LA IMAGEN (Si el link es válido, se verá aquí)
             Card(
                 modifier = Modifier
@@ -279,7 +280,14 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
                 if (isUploading) CircularProgressIndicator(modifier = Modifier.size(24.dp)) else Text("¡Publicar!")
             }
         }
+        
+        }
     }
+    AppSnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.TopCenter)
+    )
+    } // end outer Box
 }
 
 private fun createTempImageUri(context: Context): Uri? {
