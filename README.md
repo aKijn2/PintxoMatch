@@ -19,7 +19,8 @@ The project is organized around three main product areas:
 - Email and password authentication with Firebase Authentication.
 - Swipe-based pintxo discovery feed backed by Cloud Firestore.
 - Per-user star ratings with shared average score and review counts.
-- Pintxo publishing flow based on metadata and external image URLs.
+- Pintxo publishing flow with image selection from camera or gallery.
+- Image upload to Cloudinary with persisted external delivery URLs.
 - One-to-one private chat using Firebase Realtime Database.
 - Chat inbox with latest message preview and manual cleanup.
 - User profile with editable information and contribution stats.
@@ -46,7 +47,7 @@ Additional screenshots remain available in the `img/` directory for extended ref
 
 - Android UI: Kotlin, Jetpack Compose, Navigation Compose, Material 3.
 - Backend: Firebase Authentication, Cloud Firestore, Firebase Realtime Database.
-- Image loading: Coil.
+- Media: Coil for image loading and Cloudinary for image hosting.
 - Mapping: osmdroid with OpenStreetMap tiles.
 - Build configuration: Gradle Kotlin DSL.
 
@@ -127,11 +128,31 @@ cd PintxoMatch
 
 `google-services.json` should remain excluded from version control.
 
+### Cloudinary Configuration
+
+The project uploads pintxo images to Cloudinary and stores the resulting external URL in Firestore as `imageUrl`.
+
+Current values used by the app:
+
+- `cloudName`: `dm99kc8ky`
+- `uploadPreset`: `pintxomatch`
+- upload folder: `pintxomatch`
+
+If you move to a different Cloudinary account, update these values in the upload flow before building the app.
+
 ### Required Firebase Services
 
 - Authentication with Email/Password.
 - Cloud Firestore.
 - Firebase Realtime Database.
+
+## Image Handling
+
+- Pintxo images can be selected from the gallery or captured with the device camera.
+- The image file is uploaded directly to Cloudinary from the app.
+- Firestore stores only the resulting public URL in the `imageUrl` field.
+- The app does not rely on Firebase Storage for pintxo media.
+- Profile images also use the same Cloudinary-based upload approach.
 
 ## Build and Run
 
