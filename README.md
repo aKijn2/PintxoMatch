@@ -6,6 +6,7 @@ PintxoMatch es una aplicación Android desarrollada con Kotlin y Jetpack Compose
 
 - Autenticación con Firebase Authentication (registro e inicio de sesión por email/contraseña)
 - Feed de pintxos desde Firestore con interacción por swipe
+- Valoraciones con estrellas por usuario y media global visible para todos
 - Publicación de pintxos usando metadatos y URL externa de imagen (sin Firebase Storage)
 - Chat privado 1 a 1 en Realtime Database
 - Panel de chats con listado, último mensaje y borrado manual
@@ -32,6 +33,10 @@ Colección `Pintxos`:
 - `timestamp: Long`
 - `uploaderUid: String`
 - `uploaderEmail: String`
+- `ratings: Map<String, Int>`
+- `ratingCount: Long`
+- `ratingTotal: Double`
+- `averageRating: Double`
 
 ### Realtime Database
 
