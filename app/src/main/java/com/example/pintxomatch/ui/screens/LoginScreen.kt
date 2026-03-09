@@ -4,6 +4,9 @@ import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -11,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,7 +47,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmRegisterPassword by remember { mutableStateOf("") }
     var isRegistering by remember { mutableStateOf(false) } // Switch entre Login y Registro
+    var showMainPassword by remember { mutableStateOf(false) }
+    var showRegisterConfirmPassword by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -52,6 +59,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var resetCodeInput by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmNewPassword by remember { mutableStateOf("") }
+    var showResetNewPassword by remember { mutableStateOf(false) }
+    var showResetConfirmPassword by remember { mutableStateOf(false) }
     var isResetLoading by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -67,9 +76,17 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         val cleanPassword = password
             .replace("\n", "")
             .replace("\r", "")
+        val cleanConfirmRegisterPassword = confirmRegisterPassword
+            .replace("\n", "")
+            .replace("\r", "")
 
         if (cleanEmail.isBlank() || cleanPassword.length < 6) {
             alertMessage = "Mínimo 6 caracteres"
+            return
+        }
+
+        if (isRegistering && cleanPassword != cleanConfirmRegisterPassword) {
+            alertMessage = "Las contrasenas no coinciden"
             return
         }
 
@@ -199,11 +216,19 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 onValueChange = { password = it },
                 label = { Text("Contraseña") },
                 modifier = Modifier.fillMaxWidth(),
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (showMainPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { showMainPassword = !showMainPassword }) {
+                        Icon(
+                            imageVector = if (showMainPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = if (showMainPassword) "Ocultar contrasena" else "Mostrar contrasena"
+                        )
+                    }
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
+                    imeAction = if (isRegistering) ImeAction.Next else ImeAction.Done
                 ),
                 keyboardActions = KeyboardActions(
                     onDone = {
@@ -211,6 +236,36 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     }
                 )
             )
+
+            if (isRegistering) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = confirmRegisterPassword,
+                    onValueChange = { confirmRegisterPassword = it },
+                    label = { Text("Repite la contrasena") },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (showRegisterConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showRegisterConfirmPassword = !showRegisterConfirmPassword }) {
+                            Icon(
+                                imageVector = if (showRegisterConfirmPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (showRegisterConfirmPassword) "Ocultar contrasena" else "Mostrar contrasena"
+                            )
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            if (!isLoading) submitAuth()
+                        }
+                    )
+                )
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -283,7 +338,15 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     value = newPassword,
                                     onValueChange = { newPassword = it },
                                     label = { Text("Nueva contrasena") },
-                                    visualTransformation = PasswordVisualTransformation(),
+                                    visualTransformation = if (showResetNewPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { showResetNewPassword = !showResetNewPassword }) {
+                                            Icon(
+                                                imageVector = if (showResetNewPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                                contentDescription = if (showResetNewPassword) "Ocultar contrasena" else "Mostrar contrasena"
+                                            )
+                                        }
+                                    },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(
                                         keyboardType = KeyboardType.Password,
@@ -294,7 +357,15 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     value = confirmNewPassword,
                                     onValueChange = { confirmNewPassword = it },
                                     label = { Text("Repite la nueva contrasena") },
-                                    visualTransformation = PasswordVisualTransformation(),
+                                    visualTransformation = if (showResetConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { showResetConfirmPassword = !showResetConfirmPassword }) {
+                                            Icon(
+                                                imageVector = if (showResetConfirmPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                                contentDescription = if (showResetConfirmPassword) "Ocultar contrasena" else "Mostrar contrasena"
+                                            )
+                                        }
+                                    },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(
                                         keyboardType = KeyboardType.Password,
