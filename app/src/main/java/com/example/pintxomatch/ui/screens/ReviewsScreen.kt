@@ -60,6 +60,7 @@ data class ReviewItem(
 private data class RatedPintxoOption(
     val id: String,
     val name: String,
+    val barName: String,
     val myStars: Int
 )
 
@@ -95,12 +96,14 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
             .addOnSuccessListener { pintxoDocs ->
                 val loadedRatedPintxos = pintxoDocs.documents.mapNotNull { doc ->
                     val name = doc.getString("nombre") ?: "Sin nombre"
+                    val barName = doc.getString("bar") ?: "Bar desconocido"
                     val rawRatings = doc.get("ratings") as? Map<*, *> ?: return@mapNotNull null
                     val myRating = (rawRatings[uid] as? Number)?.toInt()?.coerceIn(1, 5) ?: return@mapNotNull null
 
                     RatedPintxoOption(
                         id = doc.id,
                         name = name,
+                        barName = barName,
                         myStars = myRating
                     )
                 }.sortedBy { it.name.lowercase() }
@@ -279,7 +282,9 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                     Text("Aun no has valorado ningun pintxo con estrellas.")
                                 } else {
                                     val filteredOptions = ratedPintxos.filter {
-                                        selectionSearch.isBlank() || it.name.contains(selectionSearch, ignoreCase = true)
+                                        selectionSearch.isBlank() ||
+                                            it.name.contains(selectionSearch, ignoreCase = true) ||
+                                            it.barName.contains(selectionSearch, ignoreCase = true)
                                     }
 
                                     ExposedDropdownMenuBox(
@@ -322,7 +327,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                             } else {
                                                 filteredOptions.forEach { option ->
                                                     DropdownMenuItem(
-                                                        text = { Text("${option.name} (${option.myStars} estrellas)") },
+                                                        text = { Text("${option.name} - ${option.barName} (${option.myStars} estrellas)") },
                                                         onClick = {
                                                             selectedPintxoId = option.id
                                                             selectedPintxoName = option.name
