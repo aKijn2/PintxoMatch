@@ -384,7 +384,17 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
             title = { Text("¿Deseas marcharte?") },
             text = { 
                 Column {
-                    Text("Esta acción es irreversible. Se borrarán tus datos de acceso pero tus pintxos compartidos seguirán ayudando a otros. Introduce tu contraseña para confirmar:")
+                    Text("Esta acción es irreversible.")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("Se borrará:")
+                    Text("- Tu cuenta de acceso (email/contraseña)")
+                    Text("- Tu sesión y tu perfil vinculado")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("Se conservará:")
+                    Text("- Los pintxos que ya compartiste")
+                    Text("- Tus pintxos quedarán anonimizados como 'Usuario eliminado'")
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text("Introduce tu contraseña para confirmar:")
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = deletePassword,
