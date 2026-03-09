@@ -34,11 +34,13 @@ import androidx.navigation.compose.rememberNavController
 import androidx.core.view.WindowCompat
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
-import com.example.pintxomatch.ui.screens.ChatListScreen
-import com.example.pintxomatch.ui.screens.ChatScreen
+import com.example.pintxomatch.ui.screens.HomeReviewScreen
 import com.example.pintxomatch.ui.screens.LeaderboardScreen
 import com.example.pintxomatch.ui.screens.LoginScreen
 import com.example.pintxomatch.ui.screens.NearbyRestaurantsScreen
+import com.example.pintxomatch.ui.screens.ReviewsScreen
+import com.example.pintxomatch.ui.screens.SupportChatScreen
+import com.example.pintxomatch.ui.screens.SupportInboxScreen
 import com.example.pintxomatch.ui.screens.UploadPintxoScreen
 import com.example.pintxomatch.ui.screens.UserProfileScreen
 import com.example.pintxomatch.ui.theme.PintxoMatchTheme
@@ -94,13 +96,18 @@ class MainActivity : ComponentActivity() {
 
                     // Pantalla Principal (Swipe)
                     composable("home") {
-                        MainSwipeScreen(
+                        val currentEmail = FirebaseAuth.getInstance().currentUser?.email.orEmpty()
+                        val isAdmin = currentEmail.equals("admin@pintxoresenas.com", ignoreCase = true)
+
+                        HomeReviewScreen(
+                            isAdmin = isAdmin,
                             onNavigateToProfile = { navController.navigate("profile") },
                             onNavigateToUpload = { navController.navigate("upload") },
-                            onNavigateToChat = { chatId -> navController.navigate("chat/$chatId") },
-                            onNavigateToChatList = { navController.navigate("chat_list") },
+                            onNavigateToReviews = { navController.navigate("reviews") },
                             onNavigateToLeaderboard = { navController.navigate("leaderboard") },
-                            onNavigateToNearby = { navController.navigate("nearby_restaurants") }
+                            onNavigateToNearby = { navController.navigate("nearby_restaurants") },
+                            onNavigateToSupport = { navController.navigate("support") },
+                            onNavigateToSupportInbox = { navController.navigate("support_inbox") }
                         )
                     }
 
@@ -121,20 +128,39 @@ class MainActivity : ComponentActivity() {
                         UploadPintxoScreen(onNavigateBack = { navController.popBackStack() })
                     }
 
-                    // Dentro de tu NavHost { ... }
-                    composable("chat/{chatId}") { backStackEntry ->
-                        val chatId = backStackEntry.arguments?.getString("chatId") ?: "pintxo_general"
-                        ChatScreen(
-                            chatId = chatId,
-                            onNavigateBack = { navController.popBackStack() }
-                        )
+                    composable("reviews") {
+                        ReviewsScreen(onNavigateBack = { navController.popBackStack() })
                     }
 
-                    composable("chat_list") {
-                        ChatListScreen(
-                            onNavigateBack = { navController.popBackStack() },
-                            onOpenChat = { chatId -> navController.navigate("chat/$chatId") }
-                        )
+                    composable("support") {
+                        SupportChatScreen(onNavigateBack = { navController.popBackStack() })
+                    }
+
+                    composable("support_inbox") {
+                        val currentEmail = FirebaseAuth.getInstance().currentUser?.email.orEmpty()
+                        val isAdmin = currentEmail.equals("admin@pintxoresenas.com", ignoreCase = true)
+                        if (isAdmin) {
+                            SupportInboxScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onOpenThread = { threadId -> navController.navigate("support_thread/$threadId") }
+                            )
+                        } else {
+                            SupportChatScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+                    }
+
+                    composable("support_thread/{threadId}") { backStackEntry ->
+                        val currentEmail = FirebaseAuth.getInstance().currentUser?.email.orEmpty()
+                        val isAdmin = currentEmail.equals("admin@pintxoresenas.com", ignoreCase = true)
+                        if (isAdmin) {
+                            val threadId = backStackEntry.arguments?.getString("threadId")
+                            SupportChatScreen(
+                                threadId = threadId,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        } else {
+                            SupportChatScreen(onNavigateBack = { navController.popBackStack() })
+                        }
                     }
 
                     composable("leaderboard") {
