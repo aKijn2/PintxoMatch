@@ -161,7 +161,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
         }
         val cleanText = reviewText.trim()
         if (cleanText.length < 8) {
-            alertMessage = "Escribe una resena mas detallada"
+            alertMessage = "Escribe una reseña mas detallada"
             return
         }
         if (selectedStars !in 1..5) {
@@ -224,16 +224,16 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     selectedStars = 0
                     editingReviewId = null
                     alertMessage = if (existingMine == null) {
-                        "Resena publicada"
+                        "Reseña publicada"
                     } else {
-                        "Resena actualizada"
+                        "Reseña actualizada"
                     }
                     loadData()
                 }
             }
             .addOnFailureListener {
                 isSaving = false
-                alertMessage = "No se pudo publicar la resena"
+                alertMessage = "No se pudo publicar la reseña"
             }
     }
 
@@ -291,7 +291,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                     .padding(14.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Text("Publica tu resena", fontWeight = FontWeight.Bold)
+                                Text("Publica tu reseña", fontWeight = FontWeight.Bold)
                                 if (ratedPintxos.isEmpty()) {
                                     Text("Aun no has valorado ningun pintxo con estrellas.")
                                 } else {
@@ -395,7 +395,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                         keyboardOptions = KeyboardOptions(
                                             capitalization = KeyboardCapitalization.Sentences
                                         ),
-                                        label = { Text("Tu resena") }
+                                        label = { Text("Tu reseña") }
                                     )
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Button(
