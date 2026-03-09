@@ -50,6 +50,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 data class ReviewItem(
     val id: String,
     val pintxoId: String,
+    val userUid: String,
     val pintxoName: String,
     val userName: String,
     val stars: Int,
@@ -77,6 +78,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     var showPintxoDropdown by remember { mutableStateOf(false) }
     var reviewText by remember { mutableStateOf("") }
     var selectedStars by remember { mutableIntStateOf(0) }
+    var editingReviewId by remember { mutableStateOf<String?>(null) }
     var reviews by remember { mutableStateOf<List<ReviewItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
@@ -125,6 +127,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                             ReviewItem(
                                 id = doc.id,
                                 pintxoId = doc.getString("pintxoId") ?: "",
+                                userUid = doc.getString("userUid") ?: "",
                                 pintxoName = doc.getString("pintxoName") ?: "Pintxo",
                                 userName = doc.getString("userName") ?: "Usuario",
                                 stars = stars.coerceIn(1, 5),
@@ -171,6 +174,11 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
             ?: "Usuario"
 
         isSaving = true
+        val existingMine = reviews
+            .filter { it.userUid == uid && it.pintxoId == selectedPintxoId }
+            .maxByOrNull { it.createdAt }
+
+        val targetReviewDocId = existingMine?.id ?: "${uid}_$selectedPintxoId"
         val payload = mapOf(
             "pintxoId" to selectedPintxoId,
             "pintxoName" to selectedPintxoName,
@@ -182,7 +190,8 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
         )
 
         firestore.collection("Reviews")
-            .add(payload)
+            .document(targetReviewDocId)
+            .set(payload)
             .addOnSuccessListener {
                 val docRef = firestore.collection("Pintxos").document(selectedPintxoId)
                 firestore.runTransaction { tx ->
@@ -213,7 +222,12 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     isSaving = false
                     reviewText = ""
                     selectedStars = 0
-                    alertMessage = "Resena publicada"
+                    editingReviewId = null
+                    alertMessage = if (existingMine == null) {
+                        "Resena publicada"
+                    } else {
+                        "Resena actualizada"
+                    }
                     loadData()
                 }
             }
@@ -331,7 +345,24 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                                         onClick = {
                                                             selectedPintxoId = option.id
                                                             selectedPintxoName = option.name
-                                                            selectedStars = option.myStars
+
+                                                            val myReviewForThisPintxo = reviews
+                                                                .filter { review ->
+                                                                    review.userUid == auth.currentUser?.uid &&
+                                                                        review.pintxoId == option.id
+                                                                }
+                                                                .maxByOrNull { review -> review.createdAt }
+
+                                                            if (myReviewForThisPintxo != null) {
+                                                                editingReviewId = myReviewForThisPintxo.id
+                                                                reviewText = myReviewForThisPintxo.text
+                                                                selectedStars = myReviewForThisPintxo.stars
+                                                            } else {
+                                                                editingReviewId = null
+                                                                reviewText = ""
+                                                                selectedStars = option.myStars
+                                                            }
+
                                                             selectionSearch = ""
                                                             showPintxoDropdown = false
                                                         }
@@ -371,7 +402,13 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                             onClick = { submitReview() },
                                             enabled = !isSaving
                                         ) {
-                                            Text(if (isSaving) "Publicando..." else "Publicar")
+                                            Text(
+                                                when {
+                                                    isSaving -> "Guardando..."
+                                                    editingReviewId != null -> "Actualizar reseña"
+                                                    else -> "Publicar"
+                                                }
+                                            )
                                         }
                                     }
                                 }
