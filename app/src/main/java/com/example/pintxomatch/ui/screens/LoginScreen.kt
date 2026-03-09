@@ -1,5 +1,6 @@
 package com.example.pintxomatch.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -16,6 +17,26 @@ import androidx.compose.ui.unit.sp
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.google.firebase.auth.FirebaseAuth
 
+private enum class PasswordResetStep {
+    RequestEmail,
+    ConfirmCode
+}
+
+private fun extractFirebaseActionCode(rawInput: String): String {
+    val cleanedInput = rawInput.trim()
+    if (cleanedInput.isBlank()) return ""
+
+    return try {
+        if (cleanedInput.contains("oobCode=")) {
+            Uri.parse(cleanedInput).getQueryParameter("oobCode") ?: cleanedInput
+        } else {
+            cleanedInput
+        }
+    } catch (_: Exception) {
+        cleanedInput
+    }
+}
+
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit) {
     val auth = FirebaseAuth.getInstance()
@@ -25,6 +46,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var isRegistering by remember { mutableStateOf(false) } // Switch entre Login y Registro
     var isLoading by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetStep by remember { mutableStateOf(PasswordResetStep.RequestEmail) }
+    var resetEmail by remember { mutableStateOf("") }
+    var resetCodeInput by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmNewPassword by remember { mutableStateOf("") }
+    var isResetLoading by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(alertMessage) {
@@ -69,10 +97,72 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         }
     }
 
+    fun sendPasswordResetEmail() {
+        val cleanEmail = resetEmail.trim()
+        if (cleanEmail.isBlank()) {
+            alertMessage = "Introduce tu correo"
+            return
+        }
+
+        isResetLoading = true
+        auth.sendPasswordResetEmail(cleanEmail)
+            .addOnSuccessListener {
+                isResetLoading = false
+                resetStep = PasswordResetStep.ConfirmCode
+                alertMessage = "Te enviamos un correo con el codigo/enlace de recuperacion"
+            }
+            .addOnFailureListener {
+                isResetLoading = false
+                alertMessage = "No se pudo enviar el correo: ${it.message}"
+            }
+    }
+
+    fun confirmPasswordReset() {
+        val actionCode = extractFirebaseActionCode(resetCodeInput)
+        val pwd1 = newPassword.replace("\n", "").replace("\r", "")
+        val pwd2 = confirmNewPassword.replace("\n", "").replace("\r", "")
+
+        if (actionCode.isBlank()) {
+            alertMessage = "Pega el codigo o el enlace del correo"
+            return
+        }
+        if (pwd1.length < 6) {
+            alertMessage = "La nueva contrasena debe tener minimo 6 caracteres"
+            return
+        }
+        if (pwd1 != pwd2) {
+            alertMessage = "Las contrasenas no coinciden"
+            return
+        }
+
+        isResetLoading = true
+        auth.verifyPasswordResetCode(actionCode)
+            .addOnSuccessListener {
+                auth.confirmPasswordReset(actionCode, pwd1)
+                    .addOnSuccessListener {
+                        isResetLoading = false
+                        showResetDialog = false
+                        resetStep = PasswordResetStep.RequestEmail
+                        resetCodeInput = ""
+                        newPassword = ""
+                        confirmNewPassword = ""
+                        alertMessage = "Contrasena actualizada. Ya puedes iniciar sesion"
+                    }
+                    .addOnFailureListener {
+                        isResetLoading = false
+                        alertMessage = "No se pudo actualizar la contrasena: ${it.message}"
+                    }
+            }
+            .addOnFailureListener {
+                isResetLoading = false
+                alertMessage = "Codigo invalido o expirado"
+            }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-    Scaffold(
-    ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+        ) { innerPadding ->
+            Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -134,12 +224,125 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     Text(if (isRegistering) "Registrarse" else "Entrar")
                 }
 
+                if (!isRegistering) {
+                    TextButton(
+                        onClick = {
+                            resetEmail = email.trim()
+                            resetStep = PasswordResetStep.RequestEmail
+                            showResetDialog = true
+                        }
+                    ) {
+                        Text("Olvidaste tu contrasena?")
+                    }
+                }
+
                 TextButton(onClick = { isRegistering = !isRegistering }) {
                     Text(if (isRegistering) "¿Ya tienes cuenta? Inicia sesión" else "¿No tienes cuenta? Regístrate")
                 }
             }
         }
-            
+
+            if (showResetDialog) {
+                AlertDialog(
+                    onDismissRequest = {
+                        if (!isResetLoading) {
+                            showResetDialog = false
+                        }
+                    },
+                    title = {
+                        Text("Recuperar contrasena")
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            if (resetStep == PasswordResetStep.RequestEmail) {
+                                Text("Escribe tu correo y te enviaremos un codigo/enlace para cambiar la contrasena.")
+                                OutlinedTextField(
+                                    value = resetEmail,
+                                    onValueChange = { resetEmail = it },
+                                    label = { Text("Correo electronico") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Email,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
+                                            if (!isResetLoading) sendPasswordResetEmail()
+                                        }
+                                    )
+                                )
+                            } else {
+                                Text("Pega el codigo o el enlace recibido por correo y define tu nueva contrasena.")
+                                OutlinedTextField(
+                                    value = resetCodeInput,
+                                    onValueChange = { resetCodeInput = it },
+                                    label = { Text("Codigo o enlace") },
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = newPassword,
+                                    onValueChange = { newPassword = it },
+                                    label = { Text("Nueva contrasena") },
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Next
+                                    )
+                                )
+                                OutlinedTextField(
+                                    value = confirmNewPassword,
+                                    onValueChange = { confirmNewPassword = it },
+                                    label = { Text("Repite la nueva contrasena") },
+                                    visualTransformation = PasswordVisualTransformation(),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
+                                            if (!isResetLoading) confirmPasswordReset()
+                                        }
+                                    )
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        if (isResetLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        } else {
+                            TextButton(
+                                onClick = {
+                                    if (resetStep == PasswordResetStep.RequestEmail) {
+                                        sendPasswordResetEmail()
+                                    } else {
+                                        confirmPasswordReset()
+                                    }
+                                }
+                            ) {
+                                Text(if (resetStep == PasswordResetStep.RequestEmail) "Enviar" else "Guardar")
+                            }
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                if (resetStep == PasswordResetStep.ConfirmCode) {
+                                    resetStep = PasswordResetStep.RequestEmail
+                                } else {
+                                    showResetDialog = false
+                                }
+                            },
+                            enabled = !isResetLoading
+                        ) {
+                            Text(if (resetStep == PasswordResetStep.ConfirmCode) "Atras" else "Cancelar")
+                        }
+                    }
+                )
+            }
+
         }
     }
     AppSnackbarHost(
