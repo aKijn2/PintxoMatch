@@ -1,6 +1,6 @@
-# PintxoResenas (PintxoMatch)
+# Food View X (PintxoMatch)
 
-PintxoResenas is an Android application built with Kotlin and Jetpack Compose to discover pintxos, rate them, write community reviews, and contact support in real time.
+Food View X is an Android application built with Kotlin and Jetpack Compose to discover pintxos, rate them, write community reviews, and contact support in real time.
 
 ## Overview
 

@@ -139,7 +139,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     }
                     .addOnFailureListener {
                         isLoading = false
-                        alertMessage = "No se pudieron cargar las resenas"
+                        alertMessage = "No se pudieron cargar las reseñas"
                     }
             }
             .addOnFailureListener {
@@ -252,7 +252,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Resenas de la comunidad") },
+                    title = { Text("Reseñas de la comunidad") },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
@@ -417,12 +417,12 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     }
 
                     item {
-                        Text("Ultimas resenas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Ultimas reseñas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
 
                     if (reviews.isEmpty()) {
                         item {
-                            Text("Todavia no hay resenas publicadas")
+                            Text("Todavia no hay reseñas publicadas")
                         }
                     } else {
                         items(reviews) { review ->

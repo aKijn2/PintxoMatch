@@ -229,7 +229,7 @@ fun HomeReviewScreen(
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            text = "PintxoResenas",
+                            text = "Food View X",
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -275,9 +275,9 @@ fun HomeReviewScreen(
                             windowInsets = WindowInsets(0, 0, 0, 0)
                         ) {
                             NavigationBarItem(
-                                selected = selectedFooterTab == "resenas",
+                                selected = selectedFooterTab == "reseñas",
                                 onClick = {
-                                    selectedFooterTab = "resenas"
+                                    selectedFooterTab = "reseñas"
                                     onNavigateToReviews()
                                 },
                                 icon = { Icon(Icons.Default.Edit, contentDescription = "Reseñas") },
