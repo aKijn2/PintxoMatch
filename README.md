@@ -1,17 +1,18 @@
-# PintxoMatch
+# PintxoResenas (PintxoMatch)
 
-PintxoMatch is an Android application built with Kotlin and Jetpack Compose to discover pintxos, rate them, connect with other users, and continue the experience through private chat and nearby venue exploration.
+PintxoResenas is an Android application built with Kotlin and Jetpack Compose to discover pintxos, rate them, write community reviews, and contact support in real time.
 
 ## Overview
 
-PintxoMatch combines food discovery, lightweight social interaction, and location-based exploration in a single mobile product. Users can browse pintxos, publish new entries, rate them individually while seeing a shared community average, open private chats after a match, compare rankings, and explore nearby places on an integrated map.
+The app combines food discovery, community feedback, and support operations in a single mobile product. Users can browse pintxos with swipe gestures, publish new entries, rate pintxos with stars, write one editable review per pintxo, compare rankings, and explore nearby places on an integrated map.
 
 ## Product Scope
 
 The project is organized around three main product areas:
 
 - Pintxo discovery through a swipe-based browsing experience.
-- Social interaction through ratings, matches, and one-to-one chat.
+- Community interaction through ratings and editable reviews.
+- Real-time support tickets between users and admin.
 - Nearby venue exploration with route handoff to Google Maps.
 
 ## Core Features
@@ -19,10 +20,14 @@ The project is organized around three main product areas:
 - Email and password authentication with Firebase Authentication.
 - Swipe-based pintxo discovery feed backed by Cloud Firestore.
 - Per-user star ratings with shared average score and review counts.
+- Community reviews linked to previously rated pintxos.
+- One review per user per pintxo with edit/update behavior.
 - Pintxo publishing flow with image selection from camera or gallery.
 - Image upload to Cloudinary with persisted external delivery URLs.
-- One-to-one private chat using Firebase Realtime Database.
-- Chat inbox with latest message preview and manual cleanup.
+- Real-time support chat per user ticket using Firebase Realtime Database.
+- Ticket state management: open/resolved/reopen.
+- Support message deletion and full ticket deletion (with confirmations).
+- Admin support inbox with all active threads.
 - User profile with editable information and contribution stats.
 - Ranking view for top contributors and best-rated pintxos.
 - Nearby places screen with current location, map view, filters, and Google Maps routing.
@@ -78,30 +83,48 @@ Collection `Pintxos`:
 - `ratingTotal: Double`
 - `averageRating: Double`
 
+Collection `Reviews`:
+
+- `pintxoId: String`
+- `pintxoName: String`
+- `userUid: String`
+- `userName: String`
+- `stars: Int`
+- `text: String`
+- `createdAt: Long`
+
+Review document key strategy:
+
+- `Reviews/{uid}_{pintxoId}` to prevent duplicate reviews and support editing.
+
 ### Firebase Realtime Database
 
-- `waitingByPintxo/{pintxoId}/{uid}`
-  - `displayName`
-  - `timestamp`
-
-- `chats/{chatId}`
-  - `pintxoId`
-  - `pintxoName`
-  - `updatedAt`
-  - `participants/{uid}: true`
-  - `participantNames/{uid}: String`
+- `support_chats/{threadId}` where `threadId` is usually the user uid.
+  - `meta`
+    - `userUid`
+    - `userEmail`
+    - `userName`
+    - `lastMessage`
+    - `updatedAt`
+    - `status` (`open` | `resolved`)
+    - `resolvedBy`
+    - `resolvedAt`
   - `messages/{messageId}`
     - `senderId`
     - `senderName`
     - `text`
     - `timestamp`
 
-## Chat Model
+- `admins/{uid}: true`
+  - Admin role map used by security rules.
 
-- Matching is keyed by `pintxoId`.
-- A chat is accessible only to users present in `participants`.
-- The chat screen validates access before displaying messages.
-- The flow accounts for race conditions and reopening an existing chat when appropriate.
+## Support Model
+
+- Each user has a dedicated support thread (`support_chats/{uid}`).
+- Admin can access all support threads from the inbox.
+- Both user and admin can mark a ticket as resolved or reopen it.
+- Both user and admin can delete an entire ticket.
+- User can delete own support messages; admin can delete any support message.
 
 ## Local Setup
 
@@ -167,6 +190,13 @@ You can also run the project directly from Android Studio.
 ```json
 {
   "rules": {
+    "admins": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === '3rR1Cwqv2Ccvyw9OU6s8Oxu1AJV2' && $uid === '3rR1Cwqv2Ccvyw9OU6s8Oxu1AJV2'",
+        ".validate": "newData.val() === true && $uid === '3rR1Cwqv2Ccvyw9OU6s8Oxu1AJV2'"
+      }
+    },
     "waitingByPintxo": {
       "$pintxoId": {
         "$uid": {
@@ -175,23 +205,16 @@ You can also run the project directly from Android Studio.
         }
       }
     },
-    "chats": {
-      "$chatId": {
-        ".read": "auth != null && data.child('participants').child(auth.uid).val() === true",
-        "participants": {
-          "$uid": {
-            ".write": "auth != null && auth.uid === $uid"
-          }
-        },
-        "participantNames": {
-          "$uid": {
-            ".write": "auth != null && auth.uid === $uid"
-          }
-        },
+    "support_chats": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
+      "$threadId": {
+        ".read": "auth != null && (auth.uid === $threadId || root.child('admins').child(auth.uid).val() === true)",
+        ".write": "auth != null && (auth.uid === $threadId || root.child('admins').child(auth.uid).val() === true)",
         "messages": {
           "$messageId": {
-            ".write": "auth != null && data.parent().parent().child('participants').child(auth.uid).val() === true",
-            ".validate": "newData.hasChildren(['senderId','senderName','text','timestamp'])"
+            ".read": "auth != null && (auth.uid === $threadId || root.child('admins').child(auth.uid).val() === true)",
+            ".write": "auth != null && (auth.uid === $threadId || root.child('admins').child(auth.uid).val() === true) && (newData.val() === null || (newData.hasChildren(['senderId','senderName','text','timestamp']) && newData.child('senderId').val() === auth.uid))",
+            ".validate": "newData.val() === null || newData.hasChildren(['senderId','senderName','text','timestamp'])"
           }
         }
       }
@@ -200,7 +223,10 @@ You can also run the project directly from Android Studio.
 }
 ```
 
+Use `database.rules.json` in this repository as the source of truth for RTDB rules.
+
 ## Notes
 
 - Older `Pintxos` documents without `uploaderUid` do not count toward user contribution statistics.
 - The app currently forces a light theme for visual consistency across emulator and physical devices.
+- The image section is intentionally left as-is and can be updated separately.
