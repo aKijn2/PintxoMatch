@@ -27,7 +27,7 @@ The project is organized around three main product areas:
 - Ranking view for top contributors and best-rated pintxos.
 - Nearby places screen with current location, map view, filters, and Google Maps routing.
 
-## Interface Preview
+## Interface Preview (OLD)
 
 <p align="center">
   <img src="img/Screenshot_20260306_132808.png" alt="PintxoMatch screen 1" width="180" />
