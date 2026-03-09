@@ -57,6 +57,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+private const val ADMIN_UID = "3rR1Cwqv2Ccvyw9OU6s8Oxu1AJV2"
+private const val RTDB_URL = "https://pintxomatch-default-rtdb.europe-west1.firebasedatabase.app"
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +75,18 @@ class MainActivity : ComponentActivity() {
                 // 1. EL PORTERO: Comprobamos si el usuario ya está logueado
                 val auth = FirebaseAuth.getInstance()
                 val startScreen = if (auth.currentUser == null) "login" else "home"
+
+                LaunchedEffect(auth.currentUser?.uid) {
+                    val uid = auth.currentUser?.uid
+                    if (uid == ADMIN_UID) {
+                        // Auto-bootstrap: ensures admins/{uid}=true for the configured admin account.
+                        com.google.firebase.database.FirebaseDatabase
+                            .getInstance(RTDB_URL)
+                            .getReference("admins")
+                            .child(uid)
+                            .setValue(true)
+                    }
+                }
 
                 val navController = rememberNavController()
 
@@ -96,8 +111,8 @@ class MainActivity : ComponentActivity() {
 
                     // Pantalla Principal (Swipe)
                     composable("home") {
-                        val currentEmail = FirebaseAuth.getInstance().currentUser?.email.orEmpty()
-                        val isAdmin = currentEmail.equals("admin@pintxoresenas.com", ignoreCase = true)
+                        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+                        val isAdmin = currentUid == ADMIN_UID
 
                         HomeReviewScreen(
                             isAdmin = isAdmin,
@@ -133,33 +148,45 @@ class MainActivity : ComponentActivity() {
                     }
 
                     composable("support") {
-                        SupportChatScreen(onNavigateBack = { navController.popBackStack() })
+                        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+                        val isAdmin = currentUid == ADMIN_UID
+                        SupportChatScreen(
+                            onNavigateBack = { navController.popBackStack() },
+                            isAdmin = isAdmin
+                        )
                     }
 
                     composable("support_inbox") {
-                        val currentEmail = FirebaseAuth.getInstance().currentUser?.email.orEmpty()
-                        val isAdmin = currentEmail.equals("admin@pintxoresenas.com", ignoreCase = true)
+                        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+                        val isAdmin = currentUid == ADMIN_UID
                         if (isAdmin) {
                             SupportInboxScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onOpenThread = { threadId -> navController.navigate("support_thread/$threadId") }
                             )
                         } else {
-                            SupportChatScreen(onNavigateBack = { navController.popBackStack() })
+                            SupportChatScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                isAdmin = false
+                            )
                         }
                     }
 
                     composable("support_thread/{threadId}") { backStackEntry ->
-                        val currentEmail = FirebaseAuth.getInstance().currentUser?.email.orEmpty()
-                        val isAdmin = currentEmail.equals("admin@pintxoresenas.com", ignoreCase = true)
+                        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+                        val isAdmin = currentUid == ADMIN_UID
                         if (isAdmin) {
                             val threadId = backStackEntry.arguments?.getString("threadId")
                             SupportChatScreen(
                                 threadId = threadId,
+                                isAdmin = true,
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         } else {
-                            SupportChatScreen(onNavigateBack = { navController.popBackStack() })
+                            SupportChatScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                isAdmin = false
+                            )
                         }
                     }
 

@@ -39,6 +39,7 @@ data class SupportThreadItem(
     val userName: String,
     val userEmail: String,
     val lastMessage: String,
+    val status: String,
     val updatedAt: Long
 )
 
@@ -65,6 +66,7 @@ fun SupportInboxScreen(
                         userName = meta.child("userName").getValue(String::class.java) ?: "Usuario",
                         userEmail = meta.child("userEmail").getValue(String::class.java) ?: "",
                         lastMessage = meta.child("lastMessage").getValue(String::class.java) ?: "Sin mensajes",
+                        status = meta.child("status").getValue(String::class.java) ?: "open",
                         updatedAt = meta.child("updatedAt").getValue(Long::class.java) ?: 0L
                     )
                 }.sortedByDescending { it.updatedAt }
@@ -122,6 +124,15 @@ fun SupportInboxScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(item.userName, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = if (item.status == "resolved") "Resuelto" else "Abierto",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (item.status == "resolved") {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
                                 if (item.userEmail.isNotBlank()) {
                                     Text(item.userEmail, style = MaterialTheme.typography.bodySmall)
                                 }

@@ -15,7 +15,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -47,11 +52,17 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 
+private data class SupportUiMessage(
+    val id: String,
+    val payload: ChatMessage
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportChatScreen(
     onNavigateBack: () -> Unit,
-    threadId: String? = null
+    threadId: String? = null,
+    isAdmin: Boolean = false
 ) {
     val auth = FirebaseAuth.getInstance()
     val user = auth.currentUser
@@ -65,9 +76,12 @@ fun SupportChatScreen(
         .child(effectiveThreadId)
     val messagesRef = db.child("messages")
 
-    var messages by remember { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var messages by remember { mutableStateOf<List<SupportUiMessage>>(emptyList()) }
     var text by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var ticketStatus by remember { mutableStateOf("open") }
+    var showDeleteTicketDialog by remember { mutableStateOf(false) }
+    var messageToDeleteId by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
 
@@ -92,12 +106,15 @@ fun SupportChatScreen(
         messagesRef.push().setValue(msg)
             .addOnSuccessListener {
                 db.child("meta").updateChildren(
-                    mapOf(
+                    hashMapOf<String, Any?>(
                         "userUid" to (threadId ?: uid),
                         "userEmail" to email,
                         "userName" to senderName,
                         "lastMessage" to clean,
-                        "updatedAt" to System.currentTimeMillis()
+                        "updatedAt" to System.currentTimeMillis(),
+                        "status" to "open",
+                        "resolvedBy" to null,
+                        "resolvedAt" to null
                     )
                 )
                 text = ""
@@ -110,8 +127,11 @@ fun SupportChatScreen(
     DisposableEffect(effectiveThreadId) {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val loaded = snapshot.children.mapNotNull { it.getValue(ChatMessage::class.java) }
-                    .sortedBy { it.timestamp }
+                val loaded = snapshot.children.mapNotNull { node ->
+                    val id = node.key ?: return@mapNotNull null
+                    val msg = node.getValue(ChatMessage::class.java) ?: return@mapNotNull null
+                    SupportUiMessage(id = id, payload = msg)
+                }.sortedBy { it.payload.timestamp }
                 messages = loaded
             }
 
@@ -121,6 +141,55 @@ fun SupportChatScreen(
         }
         messagesRef.addValueEventListener(listener)
         onDispose { messagesRef.removeEventListener(listener) }
+    }
+
+    DisposableEffect(effectiveThreadId) {
+        val metaRef = db.child("meta")
+        val metaListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                ticketStatus = snapshot.child("status").getValue(String::class.java) ?: "open"
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                errorMessage = "Error leyendo estado del ticket"
+            }
+        }
+
+        metaRef.addValueEventListener(metaListener)
+        onDispose { metaRef.removeEventListener(metaListener) }
+    }
+
+    fun updateTicketStatus(resolved: Boolean) {
+        if (uid.isNullOrBlank()) {
+            errorMessage = "Sesion no valida"
+            return
+        }
+
+        db.child("meta").updateChildren(
+            hashMapOf<String, Any?>(
+                "status" to if (resolved) "resolved" else "open",
+                "updatedAt" to System.currentTimeMillis(),
+                "resolvedBy" to if (resolved) uid else null,
+                "resolvedAt" to if (resolved) System.currentTimeMillis() else null
+            )
+        ).addOnFailureListener {
+            errorMessage = "No se pudo cambiar el estado"
+        }
+    }
+
+    fun deleteTicket() {
+        db.removeValue()
+            .addOnSuccessListener { onNavigateBack() }
+            .addOnFailureListener {
+                errorMessage = "No se pudo borrar el ticket"
+            }
+    }
+
+    fun deleteMessage(messageId: String) {
+        messagesRef.child(messageId).removeValue()
+            .addOnFailureListener {
+                errorMessage = "No se pudo borrar el mensaje"
+            }
     }
 
     LaunchedEffect(messages.size) {
@@ -145,6 +214,17 @@ fun SupportChatScreen(
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
                         }
+                    },
+                    actions = {
+                        IconButton(onClick = { updateTicketStatus(ticketStatus != "resolved") }) {
+                            Icon(
+                                imageVector = if (ticketStatus == "resolved") Icons.Default.Refresh else Icons.Default.Done,
+                                contentDescription = if (ticketStatus == "resolved") "Reabrir caso" else "Marcar resuelto"
+                            )
+                        }
+                        IconButton(onClick = { showDeleteTicketDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Borrar ticket")
+                        }
                     }
                 )
             }
@@ -161,14 +241,26 @@ fun SupportChatScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
+                Text(
+                    text = if (ticketStatus == "resolved") "Estado: Resuelto" else "Estado: Abierto",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (ticketStatus == "resolved") {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(messages) { msg ->
+                    items(messages, key = { it.id }) { uiMsg ->
+                        val msg = uiMsg.payload
                         val mine = msg.senderId == uid
+                        val canDeleteMessage = mine || isAdmin
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start
@@ -186,6 +278,16 @@ fun SupportChatScreen(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(msg.text)
+                                    if (canDeleteMessage) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            TextButton(onClick = { messageToDeleteId = uiMsg.id }) {
+                                                Text("Borrar")
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -202,10 +304,14 @@ fun SupportChatScreen(
                         onValueChange = { text = it },
                         modifier = Modifier.weight(1f),
                         label = { Text("Escribe al soporte") },
+                        enabled = ticketStatus != "resolved",
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = { send() })
                     )
-                    IconButton(onClick = { send() }) {
+                    IconButton(
+                        onClick = { send() },
+                        enabled = ticketStatus != "resolved"
+                    ) {
                         Icon(Icons.Default.Send, contentDescription = "Enviar")
                     }
                 }
@@ -216,5 +322,50 @@ fun SupportChatScreen(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.TopCenter)
         )
+
+        if (showDeleteTicketDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteTicketDialog = false },
+                title = { Text("Borrar ticket") },
+                text = { Text("Se borrara toda la conversacion de soporte. Esta accion no se puede deshacer.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showDeleteTicketDialog = false
+                        deleteTicket()
+                    }) {
+                        Text("Borrar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteTicketDialog = false }) {
+                        Text("Cancelar")
+                    }
+                }
+            )
+        }
+
+        if (messageToDeleteId != null) {
+            AlertDialog(
+                onDismissRequest = { messageToDeleteId = null },
+                title = { Text("Borrar mensaje") },
+                text = { Text("Quieres borrar este mensaje?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val target = messageToDeleteId
+                        messageToDeleteId = null
+                        if (!target.isNullOrBlank()) {
+                            deleteMessage(target)
+                        }
+                    }) {
+                        Text("Borrar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { messageToDeleteId = null }) {
+                        Text("Cancelar")
+                    }
+                }
+            )
+        }
     }
 }
