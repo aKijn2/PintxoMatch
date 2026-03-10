@@ -184,8 +184,15 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Responsive container (max 600dp for tablets)
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 600.dp)
+                        .fillMaxWidth()
+                ) {
                 // 1. BANNER & AVATAR SECTION
                 Box(
                     modifier = Modifier
@@ -424,18 +431,19 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                                 }
                             }
                         }
-                    }
                 }
-                Spacer(modifier = Modifier.height(50.dp))
             }
+            Spacer(modifier = Modifier.height(50.dp))
         }
-
-        AppSnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
     }
-}
+
+    AppSnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.TopCenter)
+    )
+    } // closes content lambda of Scaffold
+    } // closes Box
+} // closes UserProfileScreen
 
 @Composable
 private fun AchievementIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, name: String, unlocked: Boolean) {
