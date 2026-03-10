@@ -49,7 +49,7 @@ import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
+fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit, onNavigateToUserPintxos: () -> Unit) {
     val auth = FirebaseAuth.getInstance()
     val user = auth.currentUser
     val context = LocalContext.current
@@ -350,6 +350,15 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                     )
                     Text("Pintxos subidos", fontSize = 14.sp, fontWeight = FontWeight.Light)
                 }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = onNavigateToUserPintxos,
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+            ) {
+                Text("Editar mis Pintxos", fontSize = 16.sp)
             }
 
             Spacer(modifier = Modifier.weight(1f))

@@ -42,6 +42,8 @@ import com.example.pintxomatch.ui.screens.ReviewsScreen
 import com.example.pintxomatch.ui.screens.SupportChatScreen
 import com.example.pintxomatch.ui.screens.SupportInboxScreen
 import com.example.pintxomatch.ui.screens.UploadPintxoScreen
+import com.example.pintxomatch.ui.screens.UserPintxosScreen
+import com.example.pintxomatch.ui.screens.EditPintxoScreen
 import com.example.pintxomatch.ui.screens.UserProfileScreen
 import com.example.pintxomatch.ui.theme.PintxoMatchTheme
 import com.google.firebase.auth.FirebaseAuth
@@ -134,7 +136,23 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate("login") {
                                     popUpTo("home") { inclusive = true }
                                 }
-                            }
+                            },
+                            onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
+                        )
+                    }
+
+                    composable("user_pintxos") {
+                        UserPintxosScreen(
+                            onNavigateBack = { navController.popBackStack() },
+                            onNavigateToEdit = { pintxoId -> navController.navigate("edit_pintxo/$pintxoId") }
+                        )
+                    }
+
+                    composable("edit_pintxo/{pintxoId}") { backStackEntry ->
+                        val pintxoId = backStackEntry.arguments?.getString("pintxoId") ?: return@composable
+                        EditPintxoScreen(
+                            pintxoId = pintxoId,
+                            onNavigateBack = { navController.popBackStack() }
                         )
                     }
 
