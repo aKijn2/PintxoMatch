@@ -31,12 +31,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.pintxomatch.data.ChatMessage
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.example.pintxomatch.data.model.ChatMessage
+import com.example.pintxomatch.ui.viewmodel.ChatListUiState
+import com.example.pintxomatch.ui.viewmodel.ChatViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
 
 data class ChatListItem(
     val chatId: String,
@@ -50,79 +52,11 @@ data class ChatListItem(
 @Composable
 fun ChatListScreen(
     onNavigateBack: () -> Unit,
-    onOpenChat: (String) -> Unit
+    onOpenChat: (String) -> Unit,
+    viewModel: ChatViewModel = viewModel()
 ) {
-    val currentUid = FirebaseAuth.getInstance().currentUser?.uid
-    val chatsRef = FirebaseDatabase
-        .getInstance("https://pintxomatch-default-rtdb.europe-west1.firebasedatabase.app")
-        .getReference("chats")
-
-    var chatItems by remember { mutableStateOf<List<ChatListItem>>(emptyList()) }
+    val uiState by viewModel.chatListState.collectAsState()
     var chatToDelete by remember { mutableStateOf<String?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    DisposableEffect(Unit) {
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val newList = mutableListOf<ChatListItem>()
-
-                snapshot.children.forEach { chatSnapshot ->
-                    val chatId = chatSnapshot.key ?: return@forEach
-                    val isParticipant = currentUid?.let { uid ->
-                        chatSnapshot.child("participants").child(uid).getValue(Boolean::class.java) == true
-                    } ?: false
-
-                    if (!isParticipant) {
-                        return@forEach
-                    }
-
-                    val messagesSnapshot = chatSnapshot.child("messages")
-
-                    val parsedMessages = mutableListOf<ChatMessage>()
-                    messagesSnapshot.children.forEach { msgSnapshot ->
-                        msgSnapshot.getValue(ChatMessage::class.java)?.let { parsedMessages.add(it) }
-                    }
-
-                    val lastMsg = parsedMessages.maxByOrNull { it.timestamp }
-                    val pintxoName = chatSnapshot.child("pintxoName").getValue(String::class.java)
-                        ?: "Chat de pintxo"
-                    val otherUid = chatSnapshot.child("participants").children
-                        .mapNotNull { it.key }
-                        .firstOrNull { it != currentUid }
-                    val otherName = if (otherUid != null) {
-                        chatSnapshot.child("participantNames").child(otherUid)
-                            .getValue(String::class.java)
-                    } else {
-                        null
-                    }
-                    val title = if (otherName.isNullOrBlank()) {
-                        pintxoName
-                    } else {
-                        "$pintxoName · $otherName"
-                    }
-
-                    newList.add(
-                        ChatListItem(
-                            chatId = chatId,
-                            title = title,
-                            lastMessage = lastMsg?.text ?: "Sin mensajes todavía",
-                            lastTimestamp = lastMsg?.timestamp ?: 0L,
-                            messageCount = parsedMessages.size
-                        )
-                    )
-                }
-
-                chatItems = newList.sortedByDescending { it.lastTimestamp }
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                errorMessage = "Error cargando chats: ${error.message}"
-            }
-        }
-
-        chatsRef.addValueEventListener(listener)
-        onDispose { chatsRef.removeEventListener(listener) }
-    }
 
     Scaffold(
         topBar = {
@@ -136,57 +70,53 @@ fun ChatListScreen(
             )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(16.dp)
         ) {
-            if (errorMessage != null) {
-                Text(
-                    text = errorMessage ?: "",
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-
-            if (chatItems.isEmpty()) {
-                Text("No tienes chats activos todavía.")
-            } else {
-                chatItems.forEach { item ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenChat(item.chatId) },
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+            when (val state = uiState) {
+                is ChatListUiState.Loading -> {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+                is ChatListUiState.Error -> {
+                    Text(
+                        text = state.message,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                is ChatListUiState.Success -> {
+                    val chatItems = state.chats
+                    if (chatItems.isEmpty()) {
+                        Text("No tienes chats activos todavía.", modifier = Modifier.align(Alignment.Center))
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = item.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = item.lastMessage,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = "${item.messageCount} mensajes",
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
-
-                            IconButton(onClick = { chatToDelete = item.chatId }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Borrar chat")
+                            chatItems.forEach { item ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onOpenChat(item.chatId) },
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                            Text(item.lastMessage, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                                            Text("${item.messageCount} mensajes", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                        IconButton(onClick = { chatToDelete = item.chatId }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Borrar chat")
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -205,7 +135,7 @@ fun ChatListScreen(
                     onClick = {
                         val targetChatId = chatToDelete
                         if (targetChatId != null) {
-                            chatsRef.child(targetChatId).removeValue()
+                            viewModel.deleteChat(targetChatId)
                         }
                         chatToDelete = null
                     }
@@ -219,11 +149,5 @@ fun ChatListScreen(
                 }
             }
         )
-    }
-
-    LaunchedEffect(errorMessage) {
-        if (errorMessage != null) {
-            chatToDelete = null
-        }
     }
 }

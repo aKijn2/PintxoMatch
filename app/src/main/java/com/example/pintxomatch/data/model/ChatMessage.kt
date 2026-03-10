@@ -1,4 +1,4 @@
-package com.example.pintxomatch.data
+package com.example.pintxomatch.data.model
 
 data class ChatMessage(
     val senderId: String = "",

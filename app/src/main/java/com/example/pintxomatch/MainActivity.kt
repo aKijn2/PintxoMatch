@@ -28,23 +28,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import androidx.core.view.WindowCompat
+import com.example.pintxomatch.data.model.Pintxo
+import com.example.pintxomatch.navigation.AppNavigation
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
-import com.example.pintxomatch.ui.screens.HomeReviewScreen
-import com.example.pintxomatch.ui.screens.LeaderboardScreen
-import com.example.pintxomatch.ui.screens.LoginScreen
-import com.example.pintxomatch.ui.screens.NearbyRestaurantsScreen
-import com.example.pintxomatch.ui.screens.ReviewsScreen
-import com.example.pintxomatch.ui.screens.SupportChatScreen
-import com.example.pintxomatch.ui.screens.SupportInboxScreen
-import com.example.pintxomatch.ui.screens.UploadPintxoScreen
-import com.example.pintxomatch.ui.screens.UserPintxosScreen
-import com.example.pintxomatch.ui.screens.EditPintxoScreen
-import com.example.pintxomatch.ui.screens.UserProfileScreen
 import com.example.pintxomatch.ui.theme.PintxoMatchTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -59,9 +47,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-private const val ADMIN_UID = "3rR1Cwqv2Ccvyw9OU6s8Oxu1AJV2"
-private const val RTDB_URL = "https://pintxomatch-default-rtdb.europe-west1.firebasedatabase.app"
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,148 +59,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PintxoMatchTheme(darkTheme = false) {
-                // 1. EL PORTERO: Comprobamos si el usuario ya está logueado
-                val auth = FirebaseAuth.getInstance()
-                val startScreen = if (auth.currentUser == null) "login" else "home"
-
-                LaunchedEffect(auth.currentUser?.uid) {
-                    val uid = auth.currentUser?.uid
-                    if (uid == ADMIN_UID) {
-                        // Auto-bootstrap: ensures admins/{uid}=true for the configured admin account.
-                        com.google.firebase.database.FirebaseDatabase
-                            .getInstance(RTDB_URL)
-                            .getReference("admins")
-                            .child(uid)
-                            .setValue(true)
-                    }
-                }
-
-                val navController = rememberNavController()
-
-                // 2. NAVHOST ÚNICO: Gestiona todas las pantallas
-                NavHost(
-                    navController = navController,
-                    startDestination = startScreen,
-                    enterTransition = { fadeIn(animationSpec = tween(260)) + slideInHorizontally { it / 4 } },
-                    exitTransition = { fadeOut(animationSpec = tween(200)) + slideOutHorizontally { -it / 4 } },
-                    popEnterTransition = { fadeIn(animationSpec = tween(260)) + slideInHorizontally { -it / 4 } },
-                    popExitTransition = { fadeOut(animationSpec = tween(200)) + slideOutHorizontally { it / 4 } }
-                ) {
-
-                    // Pantalla de Login / Registro
-                    composable("login") {
-                        LoginScreen(onLoginSuccess = {
-                            navController.navigate("home") {
-                                popUpTo("login") { inclusive = true }
-                            }
-                        })
-                    }
-
-                    // Pantalla Principal (Swipe)
-                    composable("home") {
-                        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
-                        val isAdmin = currentUid == ADMIN_UID
-
-                        HomeReviewScreen(
-                            isAdmin = isAdmin,
-                            onNavigateToProfile = { navController.navigate("profile") },
-                            onNavigateToUpload = { navController.navigate("upload") },
-                            onNavigateToReviews = { navController.navigate("reviews") },
-                            onNavigateToLeaderboard = { navController.navigate("leaderboard") },
-                            onNavigateToNearby = { navController.navigate("nearby_restaurants") },
-                            onNavigateToSupport = { navController.navigate("support") },
-                            onNavigateToSupportInbox = { navController.navigate("support_inbox") }
-                        )
-                    }
-
-                    // Pantalla de Perfil (Con cierre de sesión corregido)
-                    composable("profile") {
-                        UserProfileScreen(
-                            onNavigateBack = { navController.popBackStack() },
-                            onLogout = {
-                                navController.navigate("login") {
-                                    popUpTo("home") { inclusive = true }
-                                }
-                            },
-                            onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
-                        )
-                    }
-
-                    composable("user_pintxos") {
-                        UserPintxosScreen(
-                            onNavigateBack = { navController.popBackStack() },
-                            onNavigateToEdit = { pintxoId -> navController.navigate("edit_pintxo/$pintxoId") }
-                        )
-                    }
-
-                    composable("edit_pintxo/{pintxoId}") { backStackEntry ->
-                        val pintxoId = backStackEntry.arguments?.getString("pintxoId") ?: return@composable
-                        EditPintxoScreen(
-                            pintxoId = pintxoId,
-                            onNavigateBack = { navController.popBackStack() }
-                        )
-                    }
-
-                    // Pantalla de Subida (Para añadir tortillas de Villabona)
-                    composable("upload") {
-                        UploadPintxoScreen(onNavigateBack = { navController.popBackStack() })
-                    }
-
-                    composable("reviews") {
-                        ReviewsScreen(onNavigateBack = { navController.popBackStack() })
-                    }
-
-                    composable("support") {
-                        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
-                        val isAdmin = currentUid == ADMIN_UID
-                        SupportChatScreen(
-                            onNavigateBack = { navController.popBackStack() },
-                            isAdmin = isAdmin
-                        )
-                    }
-
-                    composable("support_inbox") {
-                        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
-                        val isAdmin = currentUid == ADMIN_UID
-                        if (isAdmin) {
-                            SupportInboxScreen(
-                                onNavigateBack = { navController.popBackStack() },
-                                onOpenThread = { threadId -> navController.navigate("support_thread/$threadId") }
-                            )
-                        } else {
-                            SupportChatScreen(
-                                onNavigateBack = { navController.popBackStack() },
-                                isAdmin = false
-                            )
-                        }
-                    }
-
-                    composable("support_thread/{threadId}") { backStackEntry ->
-                        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
-                        val isAdmin = currentUid == ADMIN_UID
-                        if (isAdmin) {
-                            val threadId = backStackEntry.arguments?.getString("threadId")
-                            SupportChatScreen(
-                                threadId = threadId,
-                                isAdmin = true,
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        } else {
-                            SupportChatScreen(
-                                onNavigateBack = { navController.popBackStack() },
-                                isAdmin = false
-                            )
-                        }
-                    }
-
-                    composable("leaderboard") {
-                        LeaderboardScreen(onNavigateBack = { navController.popBackStack() })
-                    }
-
-                    composable("nearby_restaurants") {
-                        NearbyRestaurantsScreen(onNavigateBack = { navController.popBackStack() })
-                    }
-                }
+                AppNavigation()
             }
         }
     }

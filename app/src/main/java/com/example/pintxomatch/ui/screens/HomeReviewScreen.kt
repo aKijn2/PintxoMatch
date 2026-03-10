@@ -50,7 +50,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.example.pintxomatch.Pintxo
+import com.example.pintxomatch.data.model.Pintxo
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.google.firebase.auth.FirebaseAuth

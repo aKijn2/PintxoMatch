@@ -29,17 +29,13 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.pintxomatch.ui.components.AppSnackbarHost
-import com.google.firebase.auth.FirebaseAuth
+import com.example.pintxomatch.data.repository.AuthRepository
+import com.example.pintxomatch.data.repository.ImageRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.io.DataOutputStream
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,12 +46,8 @@ fun EditPintxoScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val cloudName = "dm99kc8ky"
-    val uploadPreset = "pintxomatch"
-
     val firestore = FirebaseFirestore.getInstance()
-    val auth = FirebaseAuth.getInstance()
-    val currentUser = auth.currentUser
+    val currentUser = AuthRepository.currentUser
 
     // VARIABLES DE ESTADO
     var isLoading by remember { mutableStateOf(true) }
@@ -273,11 +265,9 @@ fun EditPintxoScreen(
 
                                     val finalImageUrl = when {
                                         pickedImageUri != null -> {
-                                            uploadUriToCloudinaryEdit(
+                                            ImageRepository.uploadImage(
                                                 context = context,
-                                                uri = pickedImageUri!!,
-                                                cloudName = cloudName,
-                                                uploadPreset = uploadPreset
+                                                uri = pickedImageUri!!
                                             )
                                         }
                                         else -> originalImageUrl
@@ -388,53 +378,5 @@ private fun createTempImageUriEdit(context: Context): Uri? {
     return try {
         val tempFile = File.createTempFile("camera_edit_${System.currentTimeMillis()}", ".jpg", context.cacheDir)
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
-    } catch (_: Exception) { null }
-}
-
-private suspend fun uploadUriToCloudinaryEdit(context: Context, uri: Uri, cloudName: String, uploadPreset: String): String? {
-    val bytes = withContext(Dispatchers.IO) {
-        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-    } ?: return null
-    return uploadBytesToCloudinaryEdit(bytes, "edit_${System.currentTimeMillis()}.jpg", cloudName, uploadPreset)
-}
-
-private suspend fun uploadBytesToCloudinaryEdit(bytes: ByteArray, fileName: String, cloudName: String, uploadPreset: String): String? = withContext(Dispatchers.IO) {
-    try {
-        val boundary = "Boundary-${UUID.randomUUID()}"
-        val url = URL("https://api.cloudinary.com/v1_1/$cloudName/image/upload")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            doOutput = true
-            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-        }
-
-        DataOutputStream(connection.outputStream).use { out ->
-            fun writeTextPart(name: String, value: String) {
-                out.writeBytes("--$boundary\r\n")
-                out.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
-                out.writeBytes(value)
-                out.writeBytes("\r\n")
-            }
-            writeTextPart("upload_preset", uploadPreset)
-            writeTextPart("folder", "pintxomatch")
-
-            out.writeBytes("--$boundary\r\n")
-            out.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\n")
-            out.writeBytes("Content-Type: image/jpeg\r\n\r\n")
-            out.write(bytes)
-            out.writeBytes("\r\n")
-            out.writeBytes("--$boundary--\r\n")
-            out.flush()
-        }
-
-        val responseCode = connection.responseCode
-        val response = if (responseCode in 200..299) {
-            connection.inputStream.bufferedReader().use { it.readText() }
-        } else {
-            connection.errorStream?.bufferedReader()?.use { it.readText() }
-        }
-
-        if (responseCode !in 200..299 || response.isNullOrBlank()) null
-        else JSONObject(response).optString("secure_url")
     } catch (_: Exception) { null }
 }

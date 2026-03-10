@@ -24,39 +24,42 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.pintxomatch.data.ChatMessage
+import com.example.pintxomatch.data.repository.AuthRepository
 import com.example.pintxomatch.ui.components.AppSnackbarHost
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.example.pintxomatch.ui.viewmodel.SingleChatUiState
+import com.example.pintxomatch.ui.viewmodel.SingleChatViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+
+class SingleChatViewModelFactory(private val chatId: String) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(SingleChatViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return SingleChatViewModel(chatId = chatId) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
-    val auth = FirebaseAuth.getInstance()
-    val chatRef = FirebaseDatabase
-        .getInstance("https://pintxomatch-default-rtdb.europe-west1.firebasedatabase.app")
-        .getReference("chats")
-        .child(chatId)
-    val messagesRef = chatRef.child("messages")
-    val currentUid = auth.currentUser?.uid
+fun ChatScreen(
+    chatId: String,
+    onNavigateBack: () -> Unit,
+    viewModel: SingleChatViewModel = viewModel(factory = SingleChatViewModelFactory(chatId))
+) {
+    val uiState by viewModel.uiState.collectAsState()
 
     var messageText by remember { mutableStateOf("") }
-    var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var hasAccess by remember { mutableStateOf(false) }
-    var isCheckingAccess by remember { mutableStateOf(true) }
-    var chatTitle by remember { mutableStateOf("Chat privado") }
-    var participantPhotos by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var chatIsActive by remember { mutableStateOf(true) }
     var hasExited by remember { mutableStateOf(false) }
     var showProfileDialog by remember { mutableStateOf(false) }
     var profileDialogName by remember { mutableStateOf("Usuario") }
     var profileDialogPhoto by remember { mutableStateOf<String?>(null) }
+    
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -66,243 +69,25 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         onNavigateBack()
     }
 
-    fun currentDisplayName(): String {
-        val user = auth.currentUser
-        return user?.displayName?.takeIf { it.isNotBlank() }
-            ?: user?.email?.substringBefore("@")
-            ?: "Usuario"
+    LaunchedEffect(Unit) {
+        viewModel.initializeChat()
     }
 
-    fun currentPhotoUrl(): String {
-        return auth.currentUser?.photoUrl?.toString().orEmpty()
-    }
-
-    fun sendCurrentMessage() {
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            errorMessage = "Sesión no válida. Vuelve a iniciar sesión."
-            return
-        }
-
-        val textToSend = messageText.trim()
-        if (textToSend.isBlank()) return
-
-        if (!chatIsActive || !hasAccess) {
-            errorMessage = "Este chat ya no está disponible."
+    LaunchedEffect(uiState) {
+        if (uiState is SingleChatUiState.ErrorAndExit) {
+            val errState = uiState as SingleChatUiState.ErrorAndExit
+            errorMessage = errState.message
             exitChatOnce()
-            return
-        }
-
-        val senderName = currentDisplayName()
-                val senderPhoto = currentPhotoUrl()
-        chatRef.get()
-            .addOnSuccessListener { chatSnapshot ->
-                val canWrite = chatSnapshot.exists() &&
-                    (chatSnapshot.child("participants").child(currentUser.uid)
-                        .getValue(Boolean::class.java) == true)
-
-                if (!canWrite) {
-                    errorMessage = "Este chat fue cerrado."
-                    exitChatOnce()
-                    return@addOnSuccessListener
-                }
-
-                val msg = ChatMessage(
-                    senderId = currentUser.uid,
-                    senderName = senderName,
-                    text = textToSend,
-                    timestamp = System.currentTimeMillis()
-                )
-                messagesRef.push().setValue(msg)
-                    .addOnSuccessListener {
-                        chatRef.child("updatedAt").setValue(System.currentTimeMillis())
-                        chatRef.child("participantNames").child(currentUser.uid).setValue(senderName)
-                        if (senderPhoto.isNotBlank()) {
-                            chatRef.child("participantPhotos").child(currentUser.uid).setValue(senderPhoto)
-                        }
-                        messageText = ""
-                    }
-                    .addOnFailureListener { error ->
-                        errorMessage = "No se pudo enviar: ${error.localizedMessage ?: "error desconocido"}"
-                    }
-            }
-            .addOnFailureListener {
-                errorMessage = "No se pudo validar el chat."
-            }
-    }
-
-    LaunchedEffect(chatId, currentUid) {
-        if (currentUid.isNullOrBlank()) {
-            errorMessage = "Sesión no válida. Vuelve a iniciar sesión."
-            isCheckingAccess = false
-            exitChatOnce()
-            return@LaunchedEffect
-        }
-
-        chatRef.child("participants").child(currentUid).get()
-            .addOnSuccessListener { snapshot ->
-                hasAccess = snapshot.getValue(Boolean::class.java) == true
-                if (hasAccess) {
-                    val name = currentDisplayName()
-                    val photoUrl = currentPhotoUrl()
-                    val metadataUpdates = mapOf<String, Any>(
-                        "participants/$currentUid" to true,
-                        "participantNames/$currentUid" to name,
-                        "updatedAt" to System.currentTimeMillis()
-                    )
-                    chatRef.updateChildren(metadataUpdates)
-                    if (photoUrl.isNotBlank()) {
-                        chatRef.child("participantPhotos").child(currentUid).setValue(photoUrl)
-                    }
-                    chatRef.child("pintxoName").get().addOnSuccessListener { titleSnapshot ->
-                        val pintxoName = titleSnapshot.getValue(String::class.java)
-                        if (!pintxoName.isNullOrBlank()) {
-                            chatTitle = pintxoName
-                        }
-                    }
-                    isCheckingAccess = false
-                    return@addOnSuccessListener
-                }
-
-                messagesRef.get()
-                    .addOnSuccessListener { messagesSnapshot ->
-                        val wroteInThisChat = messagesSnapshot.children.any {
-                            it.child("senderId").getValue(String::class.java) == currentUid
-                        }
-
-                        if (wroteInThisChat) {
-                            val name = currentDisplayName()
-                            val photoUrl = currentPhotoUrl()
-                            val metadataUpdates = mapOf<String, Any>(
-                                "participants/$currentUid" to true,
-                                "participantNames/$currentUid" to name,
-                                "updatedAt" to System.currentTimeMillis()
-                            )
-                            chatRef.updateChildren(metadataUpdates)
-                            if (photoUrl.isNotBlank()) {
-                                chatRef.child("participantPhotos").child(currentUid).setValue(photoUrl)
-                            }
-                            chatRef.child("pintxoName").get().addOnSuccessListener { titleSnapshot ->
-                                val pintxoName = titleSnapshot.getValue(String::class.java)
-                                if (!pintxoName.isNullOrBlank()) {
-                                    chatTitle = pintxoName
-                                }
-                            }
-                            hasAccess = true
-                            isCheckingAccess = false
-                        } else {
-                            isCheckingAccess = false
-                            errorMessage = "No tienes acceso a este chat."
-                            exitChatOnce()
-                        }
-                    }
-                    .addOnFailureListener {
-                        isCheckingAccess = false
-                        errorMessage = "No se pudo validar acceso al chat."
-                        exitChatOnce()
-                    }
-            }
-            .addOnFailureListener {
-                isCheckingAccess = false
-                errorMessage = "No se pudo validar acceso al chat."
-                exitChatOnce()
-            }
-    }
-
-    DisposableEffect(chatId, currentUid) {
-        if (currentUid.isNullOrBlank()) {
-            onDispose { }
-        } else {
-            val chatStateListener = object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    if (!snapshot.exists()) {
-                        chatIsActive = false
-                        errorMessage = "Este chat fue eliminado."
-                        exitChatOnce()
-                        return
-                    }
-
-                    val stillParticipant = snapshot.child("participants").child(currentUid)
-                        .getValue(Boolean::class.java) == true
-
-                    if (!stillParticipant) {
-                        chatIsActive = false
-                        errorMessage = "Ya no tienes acceso a este chat."
-                        exitChatOnce()
-                        return
-                    }
-
-                    participantPhotos = snapshot.child("participantPhotos").children.mapNotNull { photoNode ->
-                        val uid = photoNode.key
-                        val photoUrl = photoNode.getValue(String::class.java)
-                        if (uid.isNullOrBlank() || photoUrl.isNullOrBlank()) null else uid to photoUrl
-                    }.toMap()
-
-                    chatIsActive = true
-                }
-
-                override fun onCancelled(error: DatabaseError) {}
-            }
-
-            chatRef.addValueEventListener(chatStateListener)
-            onDispose { chatRef.removeEventListener(chatStateListener) }
         }
     }
 
-    val navigateBackWithCleanup: () -> Unit = navigateBackWithCleanup@{
-        if (!hasAccess) {
-            exitChatOnce()
-            return@navigateBackWithCleanup
-        }
-
-        messagesRef.get()
-            .addOnSuccessListener { snapshot ->
-                if (!snapshot.exists() || snapshot.childrenCount == 0L) {
-                    chatRef.child("participants").get()
-                        .addOnSuccessListener { participantsSnapshot ->
-                            val participantCount = participantsSnapshot.childrenCount
-                            if (participantCount <= 1L) {
-                                chatRef.removeValue()
-                            }
-                            exitChatOnce()
-                        }
-                        .addOnFailureListener {
-                            exitChatOnce()
-                        }
-                    return@addOnSuccessListener
-                }
-                exitChatOnce()
-            }
-            .addOnFailureListener {
-                exitChatOnce()
-            }
+    val navigateBackWithCleanup: () -> Unit = {
+        viewModel.cleanupAndLeave()
+        exitChatOnce()
     }
 
     BackHandler {
         navigateBackWithCleanup()
-    }
-
-    // LEER MENSAJES EN TIEMPO REAL
-    DisposableEffect(chatId, hasAccess) {
-        if (!hasAccess) {
-            onDispose { }
-        } else {
-            val listener = object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val list = mutableListOf<ChatMessage>()
-                    snapshot.children.forEach {
-                        it.getValue(ChatMessage::class.java)?.let { msg -> list.add(msg) }
-                    }
-                    messages = list.sortedBy { it.timestamp }
-                }
-                override fun onCancelled(error: DatabaseError) {
-                    errorMessage = "Error al leer chat: ${error.message}"
-                }
-            }
-
-            messagesRef.addValueEventListener(listener)
-            onDispose { messagesRef.removeEventListener(listener) }
-        }
     }
 
     LaunchedEffect(errorMessage) {
@@ -312,127 +97,136 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex)
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(chatTitle) },
-                navigationIcon = {
-                    IconButton(onClick = navigateBackWithCleanup) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+        Scaffold(
+            topBar = {
+                val title = if (uiState is SingleChatUiState.Active) (uiState as SingleChatUiState.Active).chatTitle else "Cargando..."
+                TopAppBar(
+                    title = { Text(title) },
+                    navigationIcon = {
+                        IconButton(onClick = navigateBackWithCleanup) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Borrar chat")
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Borrar chat")
+                )
+            }
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (val state = uiState) {
+                    is SingleChatUiState.Loading -> {
+                        Box(
+                            modifier = Modifier.padding(padding).fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
-                }
-            )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (isCheckingAccess) {
-                Box(
-                    modifier = Modifier
-                        .padding(padding)
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else {
+                    is SingleChatUiState.ErrorAndExit -> {
+                        // Handled by LaunchedEffect
+                    }
+                    is SingleChatUiState.Active -> {
+                        LaunchedEffect(state.messages.size) {
+                            if (state.messages.isNotEmpty()) {
+                                listState.animateScrollToItem(state.messages.lastIndex)
+                            }
+                        }
 
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .imePadding()
-        ) {
-            // LISTA DE MENSAJES
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentPadding = PaddingValues(bottom = 8.dp)
-            ) {
-                items(messages) { msg ->
-                    val isMine = msg.senderId == auth.currentUser?.uid
-                    val senderPhoto = participantPhotos[msg.senderId]
-                    val senderDisplayName = if (isMine) "Tú" else msg.senderName.ifBlank { "Usuario" }
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = if (isMine) Alignment.CenterEnd else Alignment.CenterStart
-                    ) {
                         Column(
                             modifier = Modifier
-                                .padding(vertical = 4.dp)
-                                .background(
-                                    if (isMine) MaterialTheme.colorScheme.primary else Color.LightGray,
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .padding(12.dp)
+                                .padding(padding)
+                                .fillMaxSize()
+                                .imePadding()
                         ) {
-                            Text(
-                                text = senderDisplayName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isMine) Color.White else Color.DarkGray,
-                                modifier = Modifier.clickable {
-                                    profileDialogName = if (isMine) currentDisplayName() else msg.senderName.ifBlank { "Usuario" }
-                                    profileDialogPhoto = if (isMine) {
-                                        currentPhotoUrl().takeIf { it.isNotBlank() }
-                                    } else {
-                                        senderPhoto
+                            // LISTA DE MENSAJES
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                contentPadding = PaddingValues(bottom = 8.dp)
+                            ) {
+                                items(state.messages) { msg ->
+                                    val isMine = msg.senderId == AuthRepository.currentUserId
+                                    val senderPhoto = state.participantPhotos[msg.senderId]
+                                    val senderDisplayName = if (isMine) "Tú" else msg.senderName.ifBlank { "Usuario" }
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentAlignment = if (isMine) Alignment.CenterEnd else Alignment.CenterStart
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .padding(vertical = 4.dp)
+                                                .background(
+                                                    if (isMine) MaterialTheme.colorScheme.primary else Color.LightGray,
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .padding(12.dp)
+                                        ) {
+                                            Text(
+                                                text = senderDisplayName,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = if (isMine) Color.White else Color.DarkGray,
+                                                modifier = Modifier.clickable {
+                                                    profileDialogName = senderDisplayName
+                                                    profileDialogPhoto = if (isMine) AuthRepository.currentUser?.photoUrl?.toString() else senderPhoto
+                                                    showProfileDialog = true
+                                                }
+                                            )
+                                            Text(
+                                                text = msg.text,
+                                                color = if (isMine) Color.White else Color.Black
+                                            )
+                                        }
                                     }
-                                    showProfileDialog = true
                                 }
-                            )
-                            Text(
-                                text = msg.text,
-                                color = if (isMine) Color.White else Color.Black
-                            )
+                            }
+
+                            // BARRA DE ESCRITURA
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = messageText,
+                                    onValueChange = { messageText = it },
+                                    modifier = Modifier.weight(1f),
+                                    placeholder = { Text("Escribe un mensaje...") },
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                    keyboardActions = KeyboardActions(
+                                        onSend = {
+                                            if (messageText.isNotBlank()) {
+                                                viewModel.sendMessage(messageText)
+                                                messageText = ""
+                                            }
+                                        }
+                                    ),
+                                    maxLines = 4
+                                )
+                                IconButton(onClick = {
+                                    if (messageText.isNotBlank()) {
+                                        viewModel.sendMessage(messageText)
+                                        messageText = ""
+                                    }
+                                }) {
+                                    Icon(Icons.Default.Send, contentDescription = "Enviar")
+                                }
+                            }
                         }
                     }
                 }
             }
-
-            // BARRA DE ESCRITURA
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Escribe un mensaje...") },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(
-                        onSend = { sendCurrentMessage() }
-                    ),
-                    maxLines = 4
-                )
-                IconButton(onClick = { sendCurrentMessage() }) {
-                    Icon(Icons.Default.Send, contentDescription = "Enviar")
-                }
-            }
         }
-            } // Close if (isCheckingAccess) else block
-            
-        }
+        AppSnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.TopCenter))
     }
-    AppSnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.TopCenter))
-    } // end outer Box
 
     if (showProfileDialog) {
         AlertDialog(
@@ -446,10 +240,7 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                 ) {
                     if (!profileDialogPhoto.isNullOrBlank()) {
                         Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(Color.LightGray)
+                            modifier = Modifier.size(72.dp).clip(CircleShape).background(Color.LightGray)
                         ) {
                             AsyncImage(
                                 model = profileDialogPhoto,
@@ -459,18 +250,9 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                             )
                         }
                     } else {
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(Color.LightGray)
-                        )
+                        Box(modifier = Modifier.size(72.dp).clip(CircleShape).background(Color.LightGray))
                     }
-
-                    Text(
-                        text = profileDialogName,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Text(text = profileDialogName, style = MaterialTheme.typography.titleMedium)
                 }
             },
             confirmButton = {
@@ -490,11 +272,8 @@ fun ChatScreen(chatId: String, onNavigateBack: () -> Unit) {
                 TextButton(
                     onClick = {
                         showDeleteDialog = false
-                        chatRef.removeValue()
-                            .addOnSuccessListener { exitChatOnce() }
-                            .addOnFailureListener { error ->
-                                errorMessage = "No se pudo borrar: ${error.localizedMessage ?: "error desconocido"}"
-                            }
+                        viewModel.deleteChat()
+                        // deletion will trigger ErrorAndExit, which navigates back
                     }
                 ) {
                     Text("Eliminar")

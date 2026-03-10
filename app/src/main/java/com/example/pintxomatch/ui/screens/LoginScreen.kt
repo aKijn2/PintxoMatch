@@ -19,7 +19,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pintxomatch.ui.components.AppSnackbarHost
-import com.google.firebase.auth.FirebaseAuth
+import com.example.pintxomatch.data.repository.AuthRepository
 
 private enum class PasswordResetStep {
     RequestEmail,
@@ -43,7 +43,7 @@ private fun extractFirebaseActionCode(rawInput: String): String {
 
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit) {
-    val auth = FirebaseAuth.getInstance()
+    val auth = AuthRepository.auth
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }

@@ -30,8 +30,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.data.repository.AuthRepository
+import com.example.pintxomatch.data.repository.ImageRepository
 import com.google.firebase.auth.EmailAuthProvider
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.foundation.text.KeyboardOptions
@@ -40,23 +41,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.io.DataOutputStream
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit, onNavigateToUserPintxos: () -> Unit) {
-    val auth = FirebaseAuth.getInstance()
-    val user = auth.currentUser
+    val user = AuthRepository.currentUser
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-
-    val cloudName = "dm99kc8ky"
-    val uploadPreset = "pintxomatch"
 
     // ESTADOS
     var totalPintxos by remember { mutableIntStateOf(0) }
@@ -156,7 +148,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit, onNaviga
                 actions = {
                     // Botón de cerrar sesión
                     IconButton(onClick = {
-                        auth.signOut()
+                        AuthRepository.signOut()
                         onLogout()
                     }) {
                         Icon(Icons.Default.ExitToApp, "Salir", tint = Color.Red)
@@ -263,11 +255,10 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit, onNaviga
                                 isSavingProfile = true
 
                                 val uploadedPhotoUrl = if (selectedProfileImageUri != null) {
-                                    uploadUriToCloudinaryForProfile(
+                                    ImageRepository.uploadImage(
                                         context = context,
                                         uri = selectedProfileImageUri!!,
-                                        cloudName = cloudName,
-                                        uploadPreset = uploadPreset
+                                        folder = "pintxomatch/profiles"
                                     )
                                 } else {
                                     user?.photoUrl?.toString()
@@ -522,72 +513,3 @@ private fun createTempImageUriForProfile(context: Context): Uri? {
     }
 }
 
-private suspend fun uploadUriToCloudinaryForProfile(
-    context: Context,
-    uri: Uri,
-    cloudName: String,
-    uploadPreset: String
-): String? {
-    val bytes = withContext(Dispatchers.IO) {
-        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-    } ?: return null
-
-    return uploadBytesToCloudinaryForProfile(
-        bytes = bytes,
-        fileName = "profile_${System.currentTimeMillis()}.jpg",
-        cloudName = cloudName,
-        uploadPreset = uploadPreset
-    )
-}
-
-private suspend fun uploadBytesToCloudinaryForProfile(
-    bytes: ByteArray,
-    fileName: String,
-    cloudName: String,
-    uploadPreset: String
-): String? = withContext(Dispatchers.IO) {
-    try {
-        val boundary = "Boundary-${UUID.randomUUID()}"
-        val url = URL("https://api.cloudinary.com/v1_1/$cloudName/image/upload")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            doOutput = true
-            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-        }
-
-        DataOutputStream(connection.outputStream).use { out ->
-            fun writeTextPart(name: String, value: String) {
-                out.writeBytes("--$boundary\r\n")
-                out.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n\r\n")
-                out.writeBytes(value)
-                out.writeBytes("\r\n")
-            }
-
-            writeTextPart("upload_preset", uploadPreset)
-            writeTextPart("folder", "pintxomatch/profiles")
-
-            out.writeBytes("--$boundary\r\n")
-            out.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\n")
-            out.writeBytes("Content-Type: image/jpeg\r\n\r\n")
-            out.write(bytes)
-            out.writeBytes("\r\n")
-            out.writeBytes("--$boundary--\r\n")
-            out.flush()
-        }
-
-        val responseCode = connection.responseCode
-        val response = if (responseCode in 200..299) {
-            connection.inputStream.bufferedReader().use { it.readText() }
-        } else {
-            connection.errorStream?.bufferedReader()?.use { it.readText() }
-        }
-
-        if (responseCode !in 200..299 || response.isNullOrBlank()) {
-            null
-        } else {
-            JSONObject(response).optString("secure_url")
-        }
-    } catch (_: Exception) {
-        null
-    }
-}

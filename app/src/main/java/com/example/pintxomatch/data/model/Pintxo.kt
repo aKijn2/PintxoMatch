@@ -1,4 +1,4 @@
-package com.example.pintxomatch
+package com.example.pintxomatch.data.model
 
 // Esta clase representa la información de cada pintxo que veremos en la app
 data class Pintxo(

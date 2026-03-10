@@ -20,19 +20,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.pintxomatch.ui.viewmodel.SupportInboxUiState
+import com.example.pintxomatch.ui.viewmodel.SupportInboxViewModel
+import androidx.compose.foundation.layout.Box
 
 data class SupportThreadItem(
     val threadId: String,
@@ -47,43 +46,15 @@ data class SupportThreadItem(
 @Composable
 fun SupportInboxScreen(
     onNavigateBack: () -> Unit,
-    onOpenThread: (String) -> Unit
+    onOpenThread: (String) -> Unit,
+    viewModel: SupportInboxViewModel = viewModel()
 ) {
-    val ref = FirebaseDatabase
-        .getInstance("https://pintxomatch-default-rtdb.europe-west1.firebasedatabase.app")
-        .getReference("support_chats")
-
-    var items by remember { mutableStateOf<List<SupportThreadItem>>(emptyList()) }
-
-    DisposableEffect(Unit) {
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val loaded = snapshot.children.mapNotNull { thread ->
-                    val id = thread.key ?: return@mapNotNull null
-                    val meta = thread.child("meta")
-                    SupportThreadItem(
-                        threadId = id,
-                        userName = meta.child("userName").getValue(String::class.java) ?: "Usuario",
-                        userEmail = meta.child("userEmail").getValue(String::class.java) ?: "",
-                        lastMessage = meta.child("lastMessage").getValue(String::class.java) ?: "Sin mensajes",
-                        status = meta.child("status").getValue(String::class.java) ?: "open",
-                        updatedAt = meta.child("updatedAt").getValue(Long::class.java) ?: 0L
-                    )
-                }.sortedByDescending { it.updatedAt }
-                items = loaded
-            }
-
-            override fun onCancelled(error: DatabaseError) {}
-        }
-
-        ref.addValueEventListener(listener)
-        onDispose { ref.removeEventListener(listener) }
-    }
+    val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Bandeja de soporte (admin)") },
+                title = { Text("Bandeja de soporte") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
@@ -92,55 +63,66 @@ fun SupportInboxScreen(
             )
         }
     ) { paddingValues ->
-        if (items.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(16.dp)
-            ) {
-                Text("No hay conversaciones de soporte activas")
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(items) { item ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenThread(item.threadId) },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Row(
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            when (val state = uiState) {
+                is SupportInboxUiState.Loading -> {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+                is SupportInboxUiState.Error -> {
+                    Text(
+                        text = state.message,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                is SupportInboxUiState.Success -> {
+                    if (state.threads.isEmpty()) {
+                        Text(
+                            text = "No hay conversaciones de soporte activas",
+                            modifier = Modifier.align(Alignment.Center).padding(16.dp)
+                        )
+                    } else {
+                        LazyColumn(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(item.userName, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    text = if (item.status == "resolved") "Resuelto" else "Abierto",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (item.status == "resolved") {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
+                            items(state.threads) { item ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onOpenThread(item.threadId) },
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(item.userName, fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                text = if (item.status == "resolved") "Resuelto" else "Abierto",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = if (item.status == "resolved") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            if (item.userEmail.isNotBlank()) {
+                                                Text(item.userEmail, style = MaterialTheme.typography.bodySmall)
+                                            }
+                                            Text(
+                                                item.lastMessage,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
-                                )
-                                if (item.userEmail.isNotBlank()) {
-                                    Text(item.userEmail, style = MaterialTheme.typography.bodySmall)
                                 }
-                                Text(
-                                    item.lastMessage,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
                         }
                     }

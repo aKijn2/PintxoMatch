@@ -46,108 +46,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pintxomatch.ui.components.AppSnackbarHost
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-
-data class LeaderboardUser(
-    val uid: String,
-    val displayName: String,
-    val totalUploads: Int
-)
-
-data class LeaderboardPintxo(
-    val id: String,
-    val name: String,
-    val barName: String,
-    val averageRating: Double,
-    val ratingCount: Int
-)
+import com.example.pintxomatch.data.repository.AuthRepository
+import com.example.pintxomatch.data.model.LeaderboardPintxo
+import com.example.pintxomatch.data.model.LeaderboardUser
+import com.example.pintxomatch.ui.viewmodel.LeaderboardUiState
+import com.example.pintxomatch.ui.viewmodel.PintxoViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LeaderboardScreen(onNavigateBack: () -> Unit) {
-    val auth = FirebaseAuth.getInstance()
-    val currentUid = auth.currentUser?.uid
+fun LeaderboardScreen(
+    onNavigateBack: () -> Unit,
+    viewModel: PintxoViewModel = viewModel()
+) {
+    val currentUid = AuthRepository.currentUserId
+    val leaderboardState by viewModel.leaderboardState.collectAsState()
 
-    var users by remember { mutableStateOf<List<LeaderboardUser>>(emptyList()) }
-    var topRatedPintxos by remember { mutableStateOf<List<LeaderboardPintxo>>(emptyList()) }
-    var myRank by remember { mutableStateOf<Int?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(alertMessage) {
-        alertMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            alertMessage = null
-        }
+    // Obtenemos los datos actuales dependiendo del estado
+    val (users, topRatedPintxos) = when (val state = leaderboardState) {
+        is LeaderboardUiState.Success -> state.users to state.pintxos
+        else -> emptyList<LeaderboardUser>() to emptyList<LeaderboardPintxo>()
     }
 
-    LaunchedEffect(Unit) {
-        FirebaseFirestore.getInstance().collection("Pintxos")
-            .get()
-            .addOnSuccessListener { result ->
-                val grouped = result.documents.groupBy { doc ->
-                    doc.getString("uploaderUid").orEmpty()
-                }
-
-                val leaderboard = grouped
-                    .filterKeys { it.isNotBlank() }
-                    .map { (uid, docs) ->
-                        val first = docs.firstOrNull()
-                        val uploaderName = first?.getString("uploaderDisplayName")
-                            ?: first?.getString("uploaderEmail")?.substringBefore("@")
-                            ?: "Usuario"
-
-                        LeaderboardUser(
-                            uid = uid,
-                            displayName = uploaderName,
-                            totalUploads = docs.size
-                        )
-                    }
-                    .sortedByDescending { it.totalUploads }
-
-                val ratingsLeaderboard = result.documents.mapNotNull { doc ->
-                    val rawRatings = doc.get("ratings") as? Map<*, *>
-                    val fallbackRatings = rawRatings?.values
-                        ?.mapNotNull { (it as? Number)?.toInt()?.coerceIn(1, 5) }
-                        .orEmpty()
-                    val ratingCount = doc.getLong("ratingCount")?.toInt()?.coerceAtLeast(0)
-                        ?: fallbackRatings.size
-                    if (ratingCount <= 0) {
-                        return@mapNotNull null
-                    }
-
-                    val ratingTotal = doc.getDouble("ratingTotal")
-                        ?: fallbackRatings.sumOf { it.toDouble() }
-                    val averageRating = (doc.getDouble("averageRating")
-                        ?: (ratingTotal / ratingCount)).coerceIn(0.0, 5.0)
-
-                    LeaderboardPintxo(
-                        id = doc.id,
-                        name = doc.getString("nombre") ?: "Sin nombre",
-                        barName = doc.getString("bar") ?: "Bar desconocido",
-                        averageRating = averageRating,
-                        ratingCount = ratingCount
-                    )
-                }.sortedWith(
-                    compareByDescending<LeaderboardPintxo> { it.averageRating }
-                        .thenByDescending { it.ratingCount }
-                        .thenBy { it.name.lowercase() }
-                )
-
-                users = leaderboard
-                topRatedPintxos = ratingsLeaderboard
-                myRank = leaderboard.indexOfFirst { it.uid == currentUid }
-                    .takeIf { it != -1 }
-                    ?.plus(1)
-                isLoading = false
-            }
-            .addOnFailureListener {
-                isLoading = false
-                alertMessage = "No se pudo cargar el ranking"
-            }
-    }
+    val myRank = users.indexOfFirst { it.uid == currentUid }
+        .takeIf { it != -1 }
+        ?.plus(1)
 
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
@@ -163,7 +90,7 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
-            if (isLoading) {
+            if (leaderboardState is LeaderboardUiState.Loading) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -171,6 +98,15 @@ fun LeaderboardScreen(onNavigateBack: () -> Unit) {
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
+                }
+            } else if (leaderboardState is LeaderboardUiState.Error) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text((leaderboardState as LeaderboardUiState.Error).message, color = MaterialTheme.colorScheme.error)
                 }
             } else if (users.isEmpty() && topRatedPintxos.isEmpty()) {
                 Box(

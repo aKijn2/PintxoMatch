@@ -18,68 +18,27 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.pintxomatch.Pintxo
+import com.example.pintxomatch.data.model.Pintxo
 import com.example.pintxomatch.ui.components.AppSnackbarHost
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.pintxomatch.ui.viewmodel.UserPintxosUiState
+import com.example.pintxomatch.ui.viewmodel.UserPintxosViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserPintxosScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToEdit: (String) -> Unit
+    onNavigateToEdit: (String) -> Unit,
+    viewModel: UserPintxosViewModel = viewModel()
 ) {
-    var pintxos by remember { mutableStateOf<List<Pintxo>>(emptyList()) }
+    val uiState by viewModel.uiState.collectAsState()
+    
     var searchQuery by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(true) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val auth = FirebaseAuth.getInstance()
-    val firestore = FirebaseFirestore.getInstance()
-    val currentUser = auth.currentUser
-
-    LaunchedEffect(currentUser?.uid) {
-        if (currentUser == null) {
-            isLoading = false
-            return@LaunchedEffect
-        }
-        firestore.collection("Pintxos")
-            .whereEqualTo("uploaderUid", currentUser.uid)
-            .get()
-            .addOnSuccessListener { result ->
-                val list = result.documents.mapNotNull { doc ->
-                    val ratingsRaw = doc.get("ratings") as? Map<*, *> ?: emptyMap<Any, Any>()
-                    val ratings = ratingsRaw.entries.mapNotNull { (k, v) ->
-                        val uid = k as? String ?: return@mapNotNull null
-                        val rating = (v as? Number)?.toInt()?.coerceIn(1, 5) ?: return@mapNotNull null
-                        uid to rating
-                    }.toMap()
-                    val ratingCount = doc.getLong("ratingCount")?.toInt()?.coerceAtLeast(0) ?: ratings.size
-                    val ratingTotal = doc.getDouble("ratingTotal") ?: ratings.values.sumOf { it.toDouble() }
-                    val averageRating = if (ratingCount > 0) {
-                        (doc.getDouble("averageRating") ?: (ratingTotal / ratingCount)).coerceIn(0.0, 5.0)
-                    } else 0.0
-
-                    Pintxo(
-                        id = doc.id,
-                        name = doc.getString("nombre") ?: "Sin nombre",
-                        barName = doc.getString("bar") ?: "Bar desconocido",
-                        location = doc.getString("ubicacion") ?: "Ubicación desconocida",
-                        price = doc.getDouble("precio") ?: 0.0,
-                        imageUrl = doc.getString("imageUrl") ?: "",
-                        averageRating = averageRating,
-                        ratingCount = ratingCount,
-                        userRating = ratings[currentUser.uid] ?: 0
-                    )
-                }
-                pintxos = list
-                isLoading = false
-            }
-            .addOnFailureListener {
-                alertMessage = "Error al cargar tus pintxos"
-                isLoading = false
-            }
+    LaunchedEffect(Unit) {
+        viewModel.loadUserPintxos()
     }
 
     LaunchedEffect(alertMessage) {
@@ -103,18 +62,29 @@ fun UserPintxosScreen(
             }
         ) { innerPadding ->
             Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                } else if (pintxos.isEmpty()) {
-                    Text(
-                        "No has subido ningún pintxo todavía.",
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                } else {
-                    val filteredPintxos = pintxos.filter {
-                        it.name.contains(searchQuery, ignoreCase = true) ||
-                                it.barName.contains(searchQuery, ignoreCase = true)
+                when (val state = uiState) {
+                    is UserPintxosUiState.Loading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
+                    is UserPintxosUiState.Error -> {
+                        Text(
+                            text = state.message,
+                            modifier = Modifier.align(Alignment.Center),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    is UserPintxosUiState.Success -> {
+                        val pintxos = state.pintxos
+                        if (pintxos.isEmpty()) {
+                            Text(
+                                "No has subido ningún pintxo todavía.",
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        } else {
+                            val filteredPintxos = pintxos.filter {
+                                it.name.contains(searchQuery, ignoreCase = true) ||
+                                        it.barName.contains(searchQuery, ignoreCase = true)
+                            }
 
                     Column(modifier = Modifier.fillMaxSize()) {
                         OutlinedTextField(
@@ -179,6 +149,7 @@ fun UserPintxosScreen(
                                 }
                             }
                         }
+                        }
                     }
                 }
             }
@@ -187,5 +158,6 @@ fun UserPintxosScreen(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.TopCenter)
         )
+    }
     }
 }
