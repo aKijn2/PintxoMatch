@@ -7,11 +7,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -19,10 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -32,9 +25,31 @@ import com.example.pintxomatch.data.repository.ImageRepository
 import com.example.pintxomatch.data.repository.AuthRepository
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -127,229 +142,335 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Mi Perfil") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "Volver")
+    // Theme Colors based on MaterialTheme (Unifying with the rest of the app)
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorSurface = MaterialTheme.colorScheme.surface
+    val colorBackground = MaterialTheme.colorScheme.background
+    val colorOnSurface = MaterialTheme.colorScheme.onSurface
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val colorContainer = MaterialTheme.colorScheme.surfaceContainerHigh // Modern M3 container
+    val colorAccent = MaterialTheme.colorScheme.tertiary // For levels/badges
+    val colorOnline = Color(0xFF4CAF50) // Standard green for status
+
+    // Nivel basado en pintxos (cada 5 pintxos es un nivel)
+    val level = (totalPintxos / 5).coerceAtLeast(0)
+    val progressToNextLevel = (totalPintxos % 5) / 5f
+
+    Box(modifier = Modifier.fillMaxSize().background(colorBackground)) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("PERFIL DE LA COMUNIDAD", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, "Volver")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = colorBackground.copy(alpha = 0.9f),
+                        titleContentColor = colorOnSurface,
+                        navigationIconContentColor = colorOnSurface
+                    ),
+                    actions = {
+                        TextButton(onClick = { isEditing = !isEditing }) {
+                            Text(if (isEditing) "CANCELAR" else "EDITAR PERFIL", color = colorPrimary, fontWeight = FontWeight.Bold)
+                        }
                     }
-                },
-                actions = {}
-            )
-        }
-    ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+                )
+            }
+        ) { innerPadding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState()), // Permite scroll al editar
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .verticalScroll(rememberScrollState())
             ) {
-            // 1. FOTO DE PERFIL CIRCULAR
-            coil.compose.AsyncImage(
-                model = selectedProfileImageUri
-                    ?: user?.photoUrl
-                    ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80",
-                contentDescription = "Foto de perfil",
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // 2. BLOQUE DE INFORMACIÓN O EDICIÓN
-            if (isEditing) {
-                // FORMULARIO DE EDICIÓN
-                OutlinedTextField(
-                    value = nuevoNombre,
-                    onValueChange = { nuevoNombre = it },
-                    label = { Text("Nombre de usuario") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // 1. BANNER & AVATAR SECTION
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = {
-                            pickMediaLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    // Banner Image (Blurred)
+                    coil.compose.AsyncImage(
+                        model = user?.photoUrl ?: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80",
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .blur(30.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                    
+                    // Gradient overlay
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, colorBackground),
+                                    startY = 100f
+                                )
                             )
-                        },
-                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Profile Content Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        verticalAlignment = Alignment.Bottom
                     ) {
-                        Text("Galería")
-                    }
+                        // Avatar with Custom Frame
+                        Box(
+                            modifier = Modifier
+                                .size(110.dp)
+                                .border(BorderStroke(3.dp, colorPrimary), RoundedCornerShape(12.dp))
+                                .padding(4.dp)
+                                .background(colorSurface, RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(8.dp))
+                        ) {
+                            coil.compose.AsyncImage(
+                                model = selectedProfileImageUri ?: user?.photoUrl ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80",
+                                contentDescription = "Foto de perfil",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
 
-                    OutlinedButton(
-                        onClick = {
-                            val hasCameraPermission = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.CAMERA
-                            ) == PackageManager.PERMISSION_GRANTED
+                        Spacer(modifier = Modifier.width(16.dp))
 
-                            if (hasCameraPermission) {
-                                launchCameraCapture()
-                            } else {
-                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        Column(
+                            modifier = Modifier.weight(1f).padding(bottom = 8.dp)
+                        ) {
+                            Text(
+                                text = user?.displayName ?: "Comidista",
+                                color = colorOnSurface,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(colorOnline)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Explorador de Bares",
+                                    color = colorOnline,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Cámara")
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            isEditing = false
-                            selectedProfileImageUri = null
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Cancelar")
-                    }
-                    Button(
-                        onClick = {
-                            val trimmedName = nuevoNombre.trim()
-                            if (trimmedName.isEmpty()) {
-                                alertMessage = "El nombre no puede estar vacío"
-                                return@Button
-                            }
-                            if (!trimmedName.matches(Regex("^[a-zA-Z0-9 ]+$"))) {
-                                alertMessage = "El nombre solo puede contener letras y números"
-                                return@Button
-                            }
+                        }
 
-                            coroutineScope.launch {
-                                isSavingProfile = true
-
-                                val uploadedPhotoUrl = if (selectedProfileImageUri != null) {
-                                    ImageRepository.uploadImage(
-                                        context = context,
-                                        uri = selectedProfileImageUri!!,
-                                        folder = "pintxomatch/profiles"
-                                    )
-                                } else {
-                                    user?.photoUrl?.toString()
-                                }
-
-                                if (selectedProfileImageUri != null && uploadedPhotoUrl.isNullOrBlank()) {
-                                    isSavingProfile = false
-                                    alertMessage = "No se pudo subir la foto"
-                                    return@launch
-                                }
-
-                                val profileUpdates = userProfileChangeRequest {
-                                    displayName = trimmedName
-                                    if (!uploadedPhotoUrl.isNullOrBlank()) {
-                                        photoUri = Uri.parse(uploadedPhotoUrl)
-                                    }
-                                }
-
-                                user?.updateProfile(profileUpdates)?.addOnSuccessListener {
-                                    isSavingProfile = false
-                                    isEditing = false
-                                    selectedProfileImageUri = null
-                                    alertMessage = "Perfil actualizado"
-                                    nuevoNombre = trimmedName
-                                }?.addOnFailureListener {
-                                    isSavingProfile = false
-                                    alertMessage = "No se pudo actualizar el perfil"
-                                }
-                            }
-                        },
-                        enabled = !isSavingProfile,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (isSavingProfile) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text("Guardar")
+                        // Level Badge
+                        Box(
+                            modifier = Modifier
+                                .padding(bottom = 8.dp)
+                                .size(45.dp)
+                                .border(BorderStroke(2.dp, colorAccent), CircleShape)
+                                .clip(CircleShape)
+                                .background(colorContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "$level",
+                                color = colorOnSurface,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 18.sp
+                            )
                         }
                     }
                 }
-            } else {
-                // VISTA NORMAL
-                Text(
-                    text = user?.displayName ?: "Cazador de Pintxos",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = user?.email ?: "",
-                    fontSize = 14.sp,
-                    color = Color.Gray
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { isEditing = true }) {
-                    Text("Editar Perfil")
-                }
-            }
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // 3. TARJETA DE ESTADÍSTICAS
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
+                // 2. MAIN CONTENT AREA
                 Column(
                     modifier = Modifier
-                        .padding(24.dp)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
                 ) {
-                    Text("Aportaciones a la Comunidad", fontSize = 16.sp)
-                    Text(
-                        text = "$totalPintxos",
-                        fontSize = 52.sp,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text("Pintxos subidos", fontSize = 14.sp, fontWeight = FontWeight.Light)
+                    if (isEditing) {
+                        // EDITING FORM
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = colorContainer),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("CONFIGURACIÓN DEL PERFIL", color = colorPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                OutlinedTextField(
+                                    value = nuevoNombre,
+                                    onValueChange = { nuevoNombre = it },
+                                    label = { Text("Nombre real") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = { pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = colorSurface, contentColor = colorOnSurface),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.2f))
+                                    ) { Text("Galería") }
+                                    Button(
+                                        onClick = { 
+                                            val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                                            if (hasPerm) launchCameraCapture() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = colorSurface, contentColor = colorOnSurface),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.2f))
+                                    ) { Text("Cámara") }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = {
+                                        val trimmedName = nuevoNombre.trim()
+                                        if (trimmedName.isEmpty()) { alertMessage = "Nombre vacío"; return@Button }
+                                        coroutineScope.launch {
+                                            isSavingProfile = true
+                                            val uploadedUrl = if (selectedProfileImageUri != null) ImageRepository.uploadImage(context, selectedProfileImageUri!!, "pintxomatch/profiles") else user?.photoUrl?.toString()
+                                            val updates = userProfileChangeRequest { displayName = trimmedName; if (!uploadedUrl.isNullOrBlank()) photoUri = Uri.parse(uploadedUrl) }
+                                            user?.updateProfile(updates)?.addOnSuccessListener {
+                                                isSavingProfile = false; isEditing = false; selectedProfileImageUri = null; alertMessage = "Perfil actualizado"
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = colorPrimary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                                    shape = RoundedCornerShape(8.dp),
+                                    enabled = !isSavingProfile
+                                ) {
+                                    if (isSavingProfile) CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary)
+                                    else Text("GUARDAR CAMBIOS", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    } else {
+                        // PROGRESS BLOCK
+                        Text("EXPERIENCIA PINTXO", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = colorContainer),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Nivel $level", color = colorOnSurfaceVariant, fontSize = 12.sp)
+                                    Text("${totalPintxos % 5} / 5 XP", color = colorOnSurfaceVariant, fontSize = 12.sp)
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    progress = { progressToNextLevel },
+                                    modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(4.dp)),
+                                    color = colorPrimary,
+                                    trackColor = colorOnSurface.copy(alpha = 0.1f)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Aporta más pintxos para subir de nivel y desbloquear insignias.", color = colorOnSurfaceVariant, fontSize = 11.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // SHOWCASE SECTION
+                        Text("VITRINA DE LOGROS", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            AchievementIcon(Icons.Default.Restaurant, "Crítico", totalPintxos >= 1)
+                            AchievementIcon(Icons.Default.Star, "Estrella", totalPintxos >= 5)
+                            AchievementIcon(Icons.Default.LocationOn, "Ruta", totalPintxos >= 10)
+                            AchievementIcon(Icons.Default.Badge, "Leyenda", totalPintxos >= 50)
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // SUMMARY
+                        Text("RESUMEN", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = colorContainer),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("$totalPintxos", color = colorOnSurface, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text("PINTXOS COMPARTIDOS", color = colorOnSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = onNavigateToUserPintxos,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = colorPrimary.copy(alpha = 0.1f), contentColor = colorPrimary),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.3f))
+                                ) {
+                                    Text("GESTIONAR MIS APORTACIONES", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 }
+                Spacer(modifier = Modifier.height(50.dp))
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = onNavigateToUserPintxos,
-                modifier = Modifier.fillMaxWidth().height(50.dp)
-            ) {
-                Text("Editar mis Pintxos", fontSize = 16.sp)
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.height(24.dp))
-
-
         }
-        
-        }
+
+        AppSnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
-    AppSnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier.align(Alignment.TopCenter)
-    )
-    } // end outer Box
+}
 
+@Composable
+private fun AchievementIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, name: String, unlocked: Boolean) {
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorBackground = MaterialTheme.colorScheme.surface
+    val colorOnSurface = MaterialTheme.colorScheme.onSurface
+    val colorGray = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+    
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .background(colorBackground, RoundedCornerShape(8.dp))
+                .border(
+                    BorderStroke(1.dp, if (unlocked) colorPrimary else colorGray),
+                    RoundedCornerShape(8.dp)
+                )
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon, 
+                contentDescription = null, 
+                tint = if (unlocked) colorPrimary else colorGray,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = name, 
+            color = if (unlocked) colorOnSurface else colorGray, 
+            fontSize = 10.sp, 
+            fontWeight = FontWeight.Bold
+        )
+    }
 }
 
 private fun createTempImageUriForProfile(context: Context): Uri? {
