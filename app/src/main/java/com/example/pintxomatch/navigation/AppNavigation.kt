@@ -64,18 +64,14 @@ fun AppNavigation(
                 onNavigateToLeaderboard = { navController.navigate("leaderboard") },
                 onNavigateToNearby = { navController.navigate("nearby_restaurants") },
                 onNavigateToSupport = { navController.navigate("support") },
-                onNavigateToSupportInbox = { navController.navigate("support_inbox") }
+                onNavigateToSupportInbox = { navController.navigate("support_inbox") },
+                onNavigateToSettings = { navController.navigate("settings") }
             )
         }
 
         composable("profile") {
             UserProfileScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onLogout = {
-                    navController.navigate("login") {
-                        popUpTo("home") { inclusive = true }
-                    }
-                },
                 onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
             )
         }
@@ -152,6 +148,20 @@ fun AppNavigation(
 
         composable("nearby_restaurants") {
             NearbyRestaurantsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        composable("settings") {
+            SettingsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToProfile = { navController.navigate("profile") },
+                onNavigateToSupport = { navController.navigate("support") },
+                onLogout = {
+                    FirebaseAuth.getInstance().signOut()
+                    navController.navigate("login") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
+            )
         }
     }
 }

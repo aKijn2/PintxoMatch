@@ -14,8 +14,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,14 +28,10 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.pintxomatch.ui.components.AppSnackbarHost
-import com.example.pintxomatch.data.repository.AuthRepository
 import com.example.pintxomatch.data.repository.ImageRepository
-import com.google.firebase.auth.EmailAuthProvider
+import com.example.pintxomatch.data.repository.AuthRepository
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,15 +39,13 @@ import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit, onNavigateToUserPintxos: () -> Unit) {
+fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () -> Unit) {
     val user = AuthRepository.currentUser
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     // ESTADOS
     var totalPintxos by remember { mutableIntStateOf(0) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var deletePassword by remember { mutableStateOf("") }
     var isEditing by remember { mutableStateOf(false) }
     var isSavingProfile by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
@@ -145,15 +137,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit, onNaviga
                         Icon(Icons.Default.ArrowBack, "Volver")
                     }
                 },
-                actions = {
-                    // Botón de cerrar sesión
-                    IconButton(onClick = {
-                        AuthRepository.signOut()
-                        onLogout()
-                    }) {
-                        Icon(Icons.Default.ExitToApp, "Salir", tint = Color.Red)
-                    }
-                }
+                actions = {}
             )
         }
     ) { innerPadding ->
@@ -355,15 +339,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit, onNaviga
             Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 4. OPCIÓN PELIGROSA: ELIMINAR CUENTA
-            TextButton(
-                onClick = { showDeleteDialog = true },
-                colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Eliminar mi cuenta definitivamente")
-            }
+
         }
         
         }
@@ -374,126 +350,6 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit, onNaviga
     )
     } // end outer Box
 
-    // DIÁLOGO DE CONFIRMACIÓN
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { 
-                showDeleteDialog = false 
-                deletePassword = ""
-            },
-            title = { Text("¿Deseas marcharte?") },
-            text = { 
-                Column {
-                    Text("Esta acción es irreversible.")
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("Se borrará:")
-                    Text("- Tu cuenta de acceso (email/contraseña)")
-                    Text("- Tu sesión y tu perfil vinculado")
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("Se conservará:")
-                    Text("- Los pintxos que ya compartiste")
-                    Text("- Tus pintxos quedarán anonimizados como 'Usuario eliminado'")
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text("Introduce tu contraseña para confirmar:")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = deletePassword,
-                        onValueChange = { deletePassword = it },
-                        label = { Text("Contraseña") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val currentUser = user
-                        val uid = currentUser?.uid
-                        val email = currentUser?.email
-                        if (currentUser == null || uid.isNullOrBlank() || email.isNullOrBlank()) {
-                            alertMessage = "No se pudo validar la cuenta"
-                            return@Button
-                        }
-                        if (deletePassword.isBlank()) {
-                            alertMessage = "Introduce tu contraseña para continuar"
-                            return@Button
-                        }
-
-                        // 1. Re-autenticar al usuario
-                        val credential = EmailAuthProvider.getCredential(email, deletePassword)
-                        currentUser.reauthenticate(credential)
-                            .addOnSuccessListener {
-                                // 2. Anonimizar o borrar pintxos
-                                val db = FirebaseFirestore.getInstance()
-                                db.collection("Pintxos")
-                                    .whereEqualTo("uploaderUid", uid)
-                                    .get()
-                                    .addOnSuccessListener { result ->
-                                        if (result.isEmpty) {
-                                            currentUser.delete()
-                                                .addOnSuccessListener {
-                                                    alertMessage = "Cuenta eliminada"
-                                                    onLogout()
-                                                }
-                                                .addOnFailureListener {
-                                                    alertMessage = "No se pudo eliminar la cuenta: ${it.localizedMessage}"
-                                                }
-                                            return@addOnSuccessListener
-                                        }
-
-                                        val batch = db.batch()
-                                        result.documents.forEach { doc ->
-                                            batch.update(
-                                                doc.reference,
-                                                mapOf(
-                                                    "uploaderUid" to "",
-                                                    "uploaderEmail" to "",
-                                                    "uploaderDisplayName" to "Usuario eliminado"
-                                                )
-                                            )
-                                        }
-
-                                        batch.commit()
-                                            .addOnSuccessListener {
-                                                // 3. Borrar la cuenta en Auth después de proteger los datos
-                                                currentUser.delete()
-                                                    .addOnSuccessListener {
-                                                        alertMessage = "Cuenta eliminada"
-                                                        onLogout()
-                                                    }
-                                                    .addOnFailureListener {
-                                                        alertMessage = "No se pudo eliminar la cuenta: ${it.localizedMessage}"
-                                                    }
-                                            }
-                                            .addOnFailureListener {
-                                                alertMessage = "No se pudieron anonimizar tus pintxos"
-                                            }
-                                    }
-                                    .addOnFailureListener {
-                                        alertMessage = "No se pudo preparar la eliminación"
-                                    }
-                            }
-                            .addOnFailureListener {
-                                alertMessage = "Contraseña incorrecta o error de re-autenticación"
-                            }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                ) {
-                    Text("Confirmar eliminación")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { 
-                    showDeleteDialog = false 
-                    deletePassword = ""
-                }) {
-                    Text("Seguir aquí")
-                }
-            }
-        )
-    }
 }
 
 private fun createTempImageUriForProfile(context: Context): Uri? {

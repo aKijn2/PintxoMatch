@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -79,7 +80,8 @@ fun HomeReviewScreen(
     onNavigateToLeaderboard: () -> Unit,
     onNavigateToNearby: () -> Unit,
     onNavigateToSupport: () -> Unit,
-    onNavigateToSupportInbox: () -> Unit
+    onNavigateToSupportInbox: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val auth = FirebaseAuth.getInstance()
     val firestore = FirebaseFirestore.getInstance()
@@ -235,6 +237,11 @@ fun HomeReviewScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Ajustes")
+                        }
                     },
                     actions = {
                         IconButton(onClick = onNavigateToProfile) {
