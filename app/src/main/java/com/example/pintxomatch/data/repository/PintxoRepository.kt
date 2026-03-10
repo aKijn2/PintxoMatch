@@ -69,18 +69,42 @@ class PintxoRepository {
                 doc.getString("uploaderUid").orEmpty()
             }
 
+            val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+            val currentPhotoUrl = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.photoUrl?.toString().orEmpty()
+            val currentDisplayName = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()
+
             val users = grouped
                 .filterKeys { it.isNotBlank() }
                 .map { (uid, docs) ->
                     val first = docs.firstOrNull()
                     val uploaderName = first?.getString("uploaderDisplayName")
-                        ?: first?.getString("uploaderEmail")?.substringBefore("@")
+                        ?.takeIf { it.isNotBlank() }
+                        ?: if (uid == currentUid && currentDisplayName.isNotBlank()) currentDisplayName
+                        else first?.getString("uploaderEmail")?.substringBefore("@")
                         ?: "Usuario"
+                    val photoUrl = first?.getString("uploaderPhotoUrl")
+                        ?.takeIf { it.isNotBlank() }
+                        ?: if (uid == currentUid) currentPhotoUrl else ""
+
+                    // Enrich existing documents that are missing the photo or display name
+                    if (uid == currentUid) {
+                        val needsUpdate = (first?.getString("uploaderPhotoUrl").isNullOrBlank() && currentPhotoUrl.isNotBlank())
+                            || (first?.getString("uploaderDisplayName").isNullOrBlank() && currentDisplayName.isNotBlank())
+                        if (needsUpdate) {
+                            val update = mutableMapOf<String, Any>()
+                            if (currentPhotoUrl.isNotBlank()) update["uploaderPhotoUrl"] = currentPhotoUrl
+                            if (currentDisplayName.isNotBlank()) update["uploaderDisplayName"] = currentDisplayName
+                            docs.forEach { doc ->
+                                pintxosCollection.document(doc.id).update(update)
+                            }
+                        }
+                    }
 
                     LeaderboardUser(
                         uid = uid,
                         displayName = uploaderName,
-                        totalUploads = docs.size
+                        totalUploads = docs.size,
+                        profileImageUrl = photoUrl
                     )
                 }
                 .sortedByDescending { it.totalUploads }

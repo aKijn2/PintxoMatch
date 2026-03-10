@@ -248,6 +248,8 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
                             "imageUrl" to finalImageUrl,
                             "uploaderUid" to (currentUser?.uid ?: ""),
                             "uploaderEmail" to (currentUser?.email ?: ""),
+                            "uploaderDisplayName" to (currentUser?.displayName ?: currentUser?.email?.substringBefore("@") ?: ""),
+                            "uploaderPhotoUrl" to (currentUser?.photoUrl?.toString() ?: ""),
                             "timestamp" to System.currentTimeMillis()
                         )
 

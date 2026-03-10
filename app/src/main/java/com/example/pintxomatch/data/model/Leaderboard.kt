@@ -3,7 +3,8 @@ package com.example.pintxomatch.data.model
 data class LeaderboardUser(
     val uid: String,
     val displayName: String,
-    val totalUploads: Int
+    val totalUploads: Int,
+    val profileImageUrl: String = ""
 )
 
 data class LeaderboardPintxo(
