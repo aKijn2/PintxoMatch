@@ -32,9 +32,7 @@ import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.data.repository.AuthRepository
 import com.example.pintxomatch.data.repository.ImageRepository
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)

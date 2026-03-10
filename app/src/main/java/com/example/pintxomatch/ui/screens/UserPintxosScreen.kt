@@ -18,7 +18,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.pintxomatch.data.model.Pintxo
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.viewmodel.UserPintxosUiState
 import com.example.pintxomatch.ui.viewmodel.UserPintxosViewModel

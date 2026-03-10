@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.pintxomatch.data.model.Pintxo
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.example.pintxomatch.ui.viewmodel.PintxoViewModel
 import com.example.pintxomatch.ui.viewmodel.FeedUiState

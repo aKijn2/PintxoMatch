@@ -2,7 +2,6 @@ package com.example.pintxomatch.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.pintxomatch.data.model.ChatMessage
 import com.example.pintxomatch.data.repository.AuthRepository
 import com.example.pintxomatch.data.repository.ChatRepository
 import com.example.pintxomatch.ui.screens.ChatListItem
