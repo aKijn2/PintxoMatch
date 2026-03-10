@@ -56,6 +56,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -394,6 +395,7 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(bottom = 16.dp)
                     ) {
                         when {
                             isPlacesLoading && filteredRestaurants.isEmpty() -> {
@@ -479,14 +481,15 @@ private fun DiscoveryControlPanel(
     onLocateMe: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        shape = RoundedCornerShape(32.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(top = 24.dp, bottom = 20.dp, start = 20.dp, end = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -494,64 +497,102 @@ private fun DiscoveryControlPanel(
                 verticalAlignment = Alignment.Top
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(0.78f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.weight(1f).padding(end = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "SIGUE LA RONDA",
+                        text = "EXPLORA TU ZONA",
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelMedium,
+                        letterSpacing = 1.2.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                     Text(
-                        text = "Encuentra un sitio que apetezca de verdad",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        lineHeight = 28.sp
+                        text = "¿Dónde vamos hoy?",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Black,
+                        lineHeight = 32.sp
                     )
                     Text(
                         text = if (userLocation == null) {
-                            "Activa o refresca tu ubicación para ver sitios cercanos bien ordenados sobre el mapa."
+                            "Activa tu ubicación para encontrar los mejores pintxos cerca de ti."
                         } else {
-                            "Tienes $totalResults sitios en ${formatRadiusLabel(selectedRadius)} y el filtro actual es $selectedCategory."
+                            "Hemos encontrado $totalResults lugares fantásticos en un radio de ${formatRadiusLabel(selectedRadius)}."
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp
                     )
                 }
 
-                if (isLocationLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
-                } else {
-                    IconButton(onClick = onLocateMe) {
-                        Icon(Icons.Default.LocationOn, contentDescription = "Actualizar ubicación")
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                    shadowElevation = 4.dp
+                ) {
+                    if (isLocationLoading) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.5.dp
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = onLocateMe, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = "Actualizar",
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
                     }
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryPill(text = if (userLocation == null) "Ubicación pendiente" else "Ubicación lista")
-                SummaryPill(text = formatRadiusLabel(selectedRadius))
-                if (totalResults > 0) {
-                    SummaryPill(text = "$totalResults sitios")
+            // Radius Selection
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Distancia máxima",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(500, 1000, 3000).forEach { radius ->
+                        val isSelected = selectedRadius == radius
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.clickable { onRadiusSelected(radius) }
+                        ) {
+                            Text(
+                                text = formatRadiusLabel(radius),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(500, 1000, 3000).forEach { radius ->
-                    FilterChip(
-                        selected = selectedRadius == radius,
-                        onClick = { onRadiusSelected(radius) },
-                        label = { Text(formatRadiusLabel(radius)) }
-                    )
-                }
+            // Category Selection
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Categoría",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+                RestaurantFilterRow(
+                    categories = availableCategories,
+                    selectedCategory = selectedCategory,
+                    onCategorySelected = onCategorySelected
+                )
             }
-
-            RestaurantFilterRow(
-                categories = availableCategories,
-                selectedCategory = selectedCategory,
-                onCategorySelected = onCategorySelected
-            )
         }
     }
 }
@@ -594,34 +635,39 @@ private fun MapStageCard(
         }
     }
     Card(
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(32.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(top = 24.dp, bottom = 20.dp, start = 20.dp, end = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "TU MAPA",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelMedium,
+                    letterSpacing = 1.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "A un simple vistazo",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 24.sp,
+                    lineHeight = 28.sp
+                )
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
                     Text(
-                        text = "Mapa activo",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        text = "$totalResults lugares",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = "Mira la zona y decide sin salir de la vista principal",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SummaryPill(text = radiusLabel)
-                    SummaryPill(text = "$totalResults sitios")
                 }
             }
 
@@ -629,10 +675,10 @@ private fun MapStageCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp),
+                        .height(340.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
                 val mapView = remember {
@@ -655,8 +701,9 @@ private fun MapStageCard(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(320.dp),
-                    shape = RoundedCornerShape(18.dp),
+                        .height(340.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
@@ -746,13 +793,20 @@ private fun MapStageCard(
 
                         Row(
                             modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(12.dp),
+                                .align(Alignment.TopEnd)
+                                .padding(16.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            SummaryPill(text = "Tu zona")
-                            if (selectedRestaurant != null) {
-                                SummaryPill(text = "1 elegido")
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                            ) {
+                                Text(
+                                    text = "Zona: $radiusLabel",
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
@@ -815,20 +869,31 @@ private fun EmptyPlacesCard() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RestaurantFilterRow(
     categories: List<String>,
     selectedCategory: String,
     onCategorySelected: (String) -> Unit
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(end = 16.dp)
+    ) {
         items(categories) { category ->
-            FilterChip(
-                selected = selectedCategory == category,
-                onClick = { onCategorySelected(category) },
-                label = { Text(category) }
-            )
+            val isSelected = selectedCategory == category
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.clickable { onCategorySelected(category) }
+            ) {
+                Text(
+                    text = category,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 }
@@ -859,41 +924,42 @@ private fun MiniSelectedRestaurantOverlay(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Seleccionado",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.ExtraBold
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Start,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
+                        text = "Visto en el mapa",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
                         text = restaurant.name,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 20.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "${normalizeRestaurantCategory(restaurant.category)} · ${formatDistance(restaurant.distanceMeters)}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -902,14 +968,21 @@ private fun MiniSelectedRestaurantOverlay(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                FilledTonalButton(onClick = onSelectOnMap) {
-                    Text("Centrar")
+                FilledTonalButton(
+                    onClick = onSelectOnMap,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Centrar", fontWeight = FontWeight.Bold)
                 }
-                FilledTonalButton(onClick = onOpenDirections) {
-                    Text("Ruta")
+                androidx.compose.material3.Button(
+                    onClick = onOpenDirections,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Ruta", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -923,7 +996,10 @@ private fun FeaturedRestaurantCarousel(
     onSelect: (NearbyRestaurant) -> Unit,
     onOpenDirections: (NearbyRestaurant) -> Unit
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp) // Added padding so shadows aren't cut off
+    ) {
         items(restaurants) { restaurant ->
             FeaturedRestaurantCard(
                 restaurant = restaurant,
@@ -945,65 +1021,47 @@ private fun NearbyBrowserPanel(
 ) {
     Card(
         shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .padding(vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Box(
+            Column(
                 modifier = Modifier
-                    .width(46.dp)
-                    .height(5.dp)
-                    .background(
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                        RoundedCornerShape(999.dp)
-                    )
-                    .align(Alignment.CenterHorizontally)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Destacados cerca de ti",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    Text(
-                        text = "Desliza las tarjetas para descubrir más opciones sin perder el foco.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryPill(text = "$totalCount sitios")
-                SwipeHintPill()
+                Text(
+                    text = "DESTACADOS",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelMedium,
+                    letterSpacing = 1.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Los mejores de la zona",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 24.sp
+                )
+                Text(
+                    text = "Desliza para ver más opciones en tus cercanías.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
 
             if (featuredRestaurants.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FeaturedRestaurantCarousel(
-                        restaurants = featuredRestaurants,
-                        selectedRestaurantId = selectedRestaurantId,
-                        onSelect = onSelect,
-                        onOpenDirections = onOpenDirections
-                    )
-                }
+                FeaturedRestaurantCarousel(
+                    restaurants = featuredRestaurants,
+                    selectedRestaurantId = selectedRestaurantId,
+                    onSelect = onSelect,
+                    onOpenDirections = onOpenDirections
+                )
             }
         }
     }
@@ -1018,68 +1076,87 @@ private fun FeaturedRestaurantCard(
 ) {
     Card(
         modifier = Modifier
-            .width(232.dp)
+            .width(280.dp)
             .clickable(onClick = onSelect),
         shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 12.dp else 4.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                CategoryChip(text = normalizeRestaurantCategory(restaurant.category))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                ) {
+                    Text(
+                        text = normalizeRestaurantCategory(restaurant.category).uppercase(),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.tertiary,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+                
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                 ) {
                     Text(
                         text = formatDistance(restaurant.distanceMeters),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodySmall
+                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = restaurant.name,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = restaurant.address.ifBlank { "Selecciónalo para verlo mejor en el mapa y abrir la ruta" },
+                    text = restaurant.address.ifBlank { "Un rincón para descubrir en tu zona" },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 18.sp
                 )
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                TextButton(onClick = onSelect) {
-                    Text(if (isSelected) "En mapa" else "Ver")
+                if (!isSelected) {
+                    FilledTonalButton(
+                        onClick = onSelect,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Ver", fontWeight = FontWeight.Bold)
+                    }
                 }
-                TextButton(onClick = onOpenDirections) {
-                    Text("Ir")
+                androidx.compose.material3.Button(
+                    onClick = onOpenDirections,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Ir ahora", fontWeight = FontWeight.Bold)
                 }
             }
         }
