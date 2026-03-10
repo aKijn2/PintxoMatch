@@ -1,22 +1,40 @@
 package com.example.pintxomatch.ui.components
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.pintxomatch.data.model.Pintxo
 import java.util.Locale
 
@@ -25,100 +43,157 @@ fun PintxoCard(
     pintxo: Pintxo,
     onRatePintxo: ((Int) -> Unit)? = null
 ) {
-    // Card es el contenedor principal que le da esa forma de "tarjeta" con sombra
-    Card(
+    Box(
         modifier = Modifier
-            .fillMaxWidth() // Ocupa todo el ancho disponible
-            .height(520.dp) // Altura de la tarjeta
-            .padding(16.dp), // Margen exterior
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp) // Sombra
+            .fillMaxWidth()
+            .height(520.dp)
+            .clip(RoundedCornerShape(28.dp))
     ) {
-        // Column organiza las cosas de arriba a abajo
-        Column(modifier = Modifier.fillMaxSize()) {
+        // Full-bleed photo
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(pintxo.imageUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = pintxo.name,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            error = androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_alert)
+        )
 
-            // 1. ESPACIO PARA LA FOTO (Descargada de internet con control de errores)
-            coil.compose.AsyncImage(
-                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                    .data(pintxo.imageUrl)
-                    .crossfade(true) // Hace que la imagen aparezca suavemente
-                    .build(),
-                contentDescription = "Foto de ${pintxo.name}",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(Color.LightGray), // Fondo gris mientras carga
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                // Si la imagen falla, mostramos un aviso
-                error = androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_alert)
+        // Gradient overlay (dark at bottom, transparent at top)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.25f),
+                            Color.Black.copy(alpha = 0.75f),
+                            Color.Black.copy(alpha = 0.92f)
+                        )
+                    )
+                )
+        )
+
+        // Price pill (top-right)
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            shadowElevation = 4.dp
+        ) {
+            Text(
+                text = String.format(Locale.US, "%.2f €", pintxo.price),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 15.sp,
+                color = Color.White
+            )
+        }
+
+        // Bottom info overlay
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = pintxo.name,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                lineHeight = 32.sp
             )
 
-            // 2. TEXTOS CON LA INFORMACIÓN (Nombre, bar, precio)
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = pintxo.name,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(15.dp)
                 )
                 Text(
-                    text = "${pintxo.barName} - ${pintxo.location}",
-                    color = Color.DarkGray,
-                    fontSize = 16.sp
-                )
-                Text(
-                    text = String.format("%.2f \u20ac", pintxo.price),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary, // Color principal de tu app
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-
-                Text(
-                    text = "Valoración general: ${String.format(Locale.US, "%.1f", pintxo.averageRating)}",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-                Text(
-                    text = if (pintxo.ratingCount == 1) {
-                        "1 reseña"
-                    } else {
-                        "${pintxo.ratingCount} reseñas"
-                    },
-                    color = Color.DarkGray,
+                    text = "${pintxo.barName} · ${pintxo.location}",
                     fontSize = 14.sp,
-                    modifier = Modifier.padding(top = 2.dp)
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontWeight = FontWeight.Medium
                 )
+            }
 
-                Text(
-                    text = "Tu valoración",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 12.dp)
-                )
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Rating row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Row(
-                    modifier = Modifier.padding(top = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     (1..5).forEach { starIndex ->
                         Icon(
                             imageVector = Icons.Default.Star,
-                            contentDescription = "$starIndex estrellas",
-                            tint = if (starIndex <= pintxo.userRating) {
-                                MaterialTheme.colorScheme.primary
+                            contentDescription = null,
+                            tint = if (starIndex <= (pintxo.averageRating + 0.5).toInt()) {
+                                Color(0xFFFFD700)
                             } else {
-                                Color(0xFFD3D3D3)
+                                Color.White.copy(alpha = 0.35f)
                             },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .then(
-                                    if (onRatePintxo != null) {
-                                        Modifier.clickable { onRatePintxo(starIndex) }
-                                    } else {
-                                        Modifier
-                                    }
-                                )
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = String.format(Locale.US, "%.1f", pintxo.averageRating),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = " (${pintxo.ratingCount})",
+                        color = Color.White.copy(alpha = 0.65f),
+                        fontSize = 13.sp
+                    )
+                }
+
+                if (onRatePintxo != null) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color.White.copy(alpha = 0.15f),
+                        modifier = Modifier.clip(RoundedCornerShape(50))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            (1..5).forEach { starIndex ->
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = "$starIndex",
+                                    tint = if (starIndex <= pintxo.userRating) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        Color.White.copy(alpha = 0.5f)
+                                    },
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clickable { onRatePintxo(starIndex) }
+                                )
+                            }
+                        }
                     }
                 }
             }

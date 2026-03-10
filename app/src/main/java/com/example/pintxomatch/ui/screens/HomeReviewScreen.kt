@@ -3,6 +3,7 @@ package com.example.pintxomatch.ui.screens
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
@@ -48,8 +52,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.pintxomatch.data.model.Pintxo
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
@@ -58,8 +62,6 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
-import kotlin.math.abs
-import kotlin.math.roundToInt
 
 private data class HomeRatingUpdate(
     val averageRating: Double,
@@ -346,71 +348,167 @@ fun HomeReviewScreen(
                         }
                     }
                 } else {
-                    val current = pintxos[currentIndex.coerceIn(0, pintxos.lastIndex)]
+                    val safeIndex = currentIndex.coerceIn(0, pintxos.lastIndex)
+                    val current = pintxos[safeIndex]
+                    val next = pintxos.getOrNull(if (safeIndex + 1 <= pintxos.lastIndex) safeIndex + 1 else 0)
+
                     val swipeOffsetX = remember(current.id) { Animatable(0f) }
                     val coroutineScope = rememberCoroutineScope()
                     val springSpec = spring<Float>(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
+                        stiffness = Spring.StiffnessMedium
                     )
+
+                    // Derived visual values from drag offset
+                    val dragFraction = (swipeOffsetX.value / 500f).coerceIn(-1f, 1f)
+                    val cardRotation = swipeOffsetX.value / 22f
+                    val likeAlpha = (dragFraction).coerceAtLeast(0f)
+                    val nopeAlpha = (-dragFraction).coerceAtLeast(0f)
+                    // Next card scales up as current card is dragged away
+                    val nextCardScale = 0.88f + (0.12f * kotlin.math.abs(dragFraction))
 
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Box(
-                            modifier = Modifier
-                                .offset { IntOffset(swipeOffsetX.value.roundToInt(), 0) }
-                                .graphicsLayer {
-                                    rotationZ = swipeOffsetX.value / 30f
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Next card (behind, smaller)
+                            if (next != null && next.id != current.id) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .graphicsLayer {
+                                            scaleX = nextCardScale
+                                            scaleY = nextCardScale
+                                            alpha = 0.72f + 0.28f * kotlin.math.abs(dragFraction)
+                                        }
+                                ) {
+                                    PintxoCard(pintxo = next, onRatePintxo = null)
                                 }
-                                .pointerInput(current.id) {
-                                    detectDragGestures(
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            coroutineScope.launch {
-                                                swipeOffsetX.snapTo(swipeOffsetX.value + dragAmount.x)
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            coroutineScope.launch {
-                                                val threshold = 220f
-                                                when {
-                                                    swipeOffsetX.value > threshold -> {
-                                                        swipeOffsetX.animateTo(900f)
-                                                        previousPintxo()
-                                                        swipeOffsetX.snapTo(0f)
-                                                    }
-                                                    swipeOffsetX.value < -threshold -> {
-                                                        swipeOffsetX.animateTo(-900f)
-                                                        nextPintxo()
-                                                        swipeOffsetX.snapTo(0f)
-                                                    }
-                                                    else -> {
-                                                        swipeOffsetX.animateTo(0f, springSpec)
+                            }
+
+                            // Current card (on top)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer {
+                                        translationX = swipeOffsetX.value
+                                        rotationZ = cardRotation
+                                    }
+                                    .pointerInput(current.id) {
+                                        detectDragGestures(
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                coroutineScope.launch {
+                                                    swipeOffsetX.snapTo(swipeOffsetX.value + dragAmount.x)
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                coroutineScope.launch {
+                                                    val threshold = 200f
+                                                    when {
+                                                        swipeOffsetX.value > threshold -> {
+                                                            swipeOffsetX.animateTo(1200f)
+                                                            previousPintxo()
+                                                            swipeOffsetX.snapTo(0f)
+                                                        }
+                                                        swipeOffsetX.value < -threshold -> {
+                                                            swipeOffsetX.animateTo(-1200f)
+                                                            nextPintxo()
+                                                            swipeOffsetX.snapTo(0f)
+                                                        }
+                                                        else -> {
+                                                            swipeOffsetX.animateTo(0f, springSpec)
+                                                        }
                                                     }
                                                 }
                                             }
+                                        )
+                                    }
+                            ) {
+                                PintxoCard(
+                                    pintxo = current,
+                                    onRatePintxo = { stars -> submitRating(current, stars) }
+                                )
+
+                                // LIKE label (swipe right)
+                                if (likeAlpha > 0.05f) {
+                                    androidx.compose.foundation.layout.Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .padding(24.dp)
+                                            .graphicsLayer { alpha = likeAlpha }
+                                    ) {
+                                        Surface(
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                            color = Color(0xFF00C853),
+                                            modifier = Modifier.graphicsLayer {
+                                                rotationZ = -15f
+                                            }
+                                        ) {
+                                            Text(
+                                                text = "ANTERIOR",
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 18.sp,
+                                                color = Color.White
+                                            )
                                         }
-                                    )
+                                    }
                                 }
-                        ) {
-                            PintxoCard(
-                                pintxo = current,
-                                onRatePintxo = { stars -> submitRating(current, stars) }
-                            )
+
+                                // NOPE label (swipe left)
+                                if (nopeAlpha > 0.05f) {
+                                    androidx.compose.foundation.layout.Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(24.dp)
+                                            .graphicsLayer { alpha = nopeAlpha }
+                                    ) {
+                                        Surface(
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.graphicsLayer {
+                                                rotationZ = 15f
+                                            }
+                                        ) {
+                                            Text(
+                                                text = "SIGUIENTE",
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 18.sp,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
 
-                        Text(
-                            text = if (abs(swipeOffsetX.value) > 20f) {
-                                "Suelta para cambiar de pintxo"
-                            } else {
-                                "Desliza a izquierda o derecha para cambiar"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        // Dot progress indicators
+                        val visibleDots = minOf(pintxos.size, 7)
+                        val startIndex = (safeIndex - visibleDots / 2).coerceIn(0, (pintxos.size - visibleDots).coerceAtLeast(0))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            (startIndex until startIndex + visibleDots).forEach { i ->
+                                val isActive = i == safeIndex
+                                Box(
+                                    modifier = Modifier
+                                        .size(if (isActive) 10.dp else 6.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isActive) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                                        )
+                                )
+                            }
+                        }
                     }
                 }
             }
