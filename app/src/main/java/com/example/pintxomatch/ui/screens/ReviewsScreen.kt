@@ -1,24 +1,34 @@
 package com.example.pintxomatch.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import coil.compose.SubcomposeAsyncImage
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -28,8 +38,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,10 +47,16 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -51,6 +67,7 @@ data class ReviewItem(
     val userUid: String,
     val pintxoName: String,
     val userName: String,
+    val photoUrl: String,
     val stars: Int,
     val text: String,
     val createdAt: Long
@@ -99,13 +116,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     val barName = doc.getString("bar") ?: "Bar desconocido"
                     val rawRatings = doc.get("ratings") as? Map<*, *> ?: return@mapNotNull null
                     val myRating = (rawRatings[uid] as? Number)?.toInt()?.coerceIn(1, 5) ?: return@mapNotNull null
-
-                    RatedPintxoOption(
-                        id = doc.id,
-                        name = name,
-                        barName = barName,
-                        myStars = myRating
-                    )
+                    RatedPintxoOption(id = doc.id, name = name, barName = barName, myStars = myRating)
                 }.sortedBy { it.name.lowercase() }
 
                 ratedPintxos = loadedRatedPintxos
@@ -128,6 +139,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                 userUid = doc.getString("userUid") ?: "",
                                 pintxoName = doc.getString("pintxoName") ?: "Pintxo",
                                 userName = doc.getString("userName") ?: "Usuario",
+                                photoUrl = doc.getString("photoUrl") ?: "",
                                 stars = stars.coerceIn(1, 5),
                                 text = doc.getString("text") ?: "",
                                 createdAt = doc.getLong("createdAt") ?: 0L
@@ -149,23 +161,11 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     fun submitReview() {
         val user = auth.currentUser
         val uid = user?.uid
-        if (uid.isNullOrBlank()) {
-            alertMessage = "Sesion no valida"
-            return
-        }
-        if (selectedPintxoId.isBlank()) {
-            alertMessage = "Selecciona un pintxo"
-            return
-        }
+        if (uid.isNullOrBlank()) { alertMessage = "Sesion no valida"; return }
+        if (selectedPintxoId.isBlank()) { alertMessage = "Selecciona un pintxo"; return }
         val cleanText = reviewText.trim()
-        if (cleanText.length < 8) {
-            alertMessage = "Escribe una reseña mas detallada"
-            return
-        }
-        if (selectedStars !in 1..5) {
-            alertMessage = "Selecciona de 1 a 5 estrellas"
-            return
-        }
+        if (cleanText.length < 8) { alertMessage = "Escribe una reseña mas detallada"; return }
+        if (selectedStars !in 1..5) { alertMessage = "Selecciona de 1 a 5 estrellas"; return }
 
         val userName = user.displayName?.takeIf { it.isNotBlank() }
             ?: user.email?.substringBefore("@")
@@ -182,6 +182,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
             "pintxoName" to selectedPintxoName,
             "userUid" to uid,
             "userName" to userName,
+            "photoUrl" to (user.photoUrl?.toString() ?: ""),
             "stars" to selectedStars,
             "text" to cleanText,
             "createdAt" to System.currentTimeMillis()
@@ -201,9 +202,8 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                         key to value
                     }.toMap().toMutableMap()
 
-                    val previous = ratings[uid] ?: 0
                     ratings[uid] = selectedStars
-                    val ratingCount = if (previous == 0) ratings.size else ratings.size
+                    val ratingCount = ratings.size
                     val ratingTotal = ratings.values.sumOf { it.toDouble() }
                     val averageRating = if (ratingCount > 0) ratingTotal / ratingCount else 0.0
 
@@ -221,11 +221,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     reviewText = ""
                     selectedStars = 0
                     editingReviewId = null
-                    alertMessage = if (existingMine == null) {
-                        "Reseña publicada"
-                    } else {
-                        "Reseña actualizada"
-                    }
+                    alertMessage = if (existingMine == null) "Reseña publicada" else "Reseña actualizada"
                     loadData()
                 }
             }
@@ -235,9 +231,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
             }
     }
 
-    LaunchedEffect(Unit) {
-        loadData()
-    }
+    LaunchedEffect(Unit) { loadData() }
 
     LaunchedEffect(alertMessage) {
         alertMessage?.let {
@@ -246,52 +240,91 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
         }
     }
 
-    BoxWithSnack(snackbarHostState = snackbarHostState) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Reseñas de la comunidad") },
-                    navigationIcon = {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding(),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = "Volver",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Column {
+                            Text(
+                                text = "Reseñas",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "de la comunidad",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
-                )
+                }
             }
         ) { paddingValues ->
             if (isLoading) {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues),
-                    verticalArrangement = Arrangement.Center
+                    contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.padding(horizontal = 24.dp))
+                    CircularProgressIndicator()
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(paddingValues),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .shadow(4.dp, RoundedCornerShape(20.dp)),
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
-                                Text("Publica tu reseña", fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "Escribe tu reseña",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+
                                 if (ratedPintxos.isEmpty()) {
-                                    Text("Aun no has valorado ningun pintxo con estrellas.")
+                                    Text(
+                                        text = "Valora un pintxo primero para poder escribir una reseña.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 } else {
                                     val filteredOptions = ratedPintxos.filter {
                                         selectionSearch.isBlank() ||
@@ -304,11 +337,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                         onExpandedChange = { showPintxoDropdown = it }
                                     ) {
                                         OutlinedTextField(
-                                            value = if (selectionSearch.isNotBlank()) {
-                                                selectionSearch
-                                            } else {
-                                                selectedPintxoName
-                                            },
+                                            value = if (selectionSearch.isNotBlank()) selectionSearch else selectedPintxoName,
                                             onValueChange = {
                                                 selectionSearch = it
                                                 showPintxoDropdown = true
@@ -316,11 +345,12 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                             modifier = Modifier
                                                 .menuAnchor()
                                                 .fillMaxWidth(),
-                                            label = { Text("Pintxo seleccionado") },
-                                            placeholder = { Text("Pulsa para elegir el pintxo valorado") },
+                                            label = { Text("Pintxo") },
+                                            placeholder = { Text("Elige el pintxo a reseñar") },
                                             trailingIcon = {
                                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = showPintxoDropdown)
                                             },
+                                            shape = RoundedCornerShape(12.dp),
                                             singleLine = true
                                         )
 
@@ -339,28 +369,31 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                             } else {
                                                 filteredOptions.forEach { option ->
                                                     DropdownMenuItem(
-                                                        text = { Text("${option.name} - ${option.barName} (${option.myStars} estrellas)") },
+                                                        text = {
+                                                            Column {
+                                                                Text(option.name, fontWeight = FontWeight.Medium)
+                                                                Text(
+                                                                    "${option.barName} · ${option.myStars}★",
+                                                                    style = MaterialTheme.typography.bodySmall,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
+                                                        },
                                                         onClick = {
                                                             selectedPintxoId = option.id
                                                             selectedPintxoName = option.name
-
-                                                            val myReviewForThisPintxo = reviews
-                                                                .filter { review ->
-                                                                    review.userUid == auth.currentUser?.uid &&
-                                                                        review.pintxoId == option.id
-                                                                }
-                                                                .maxByOrNull { review -> review.createdAt }
-
-                                                            if (myReviewForThisPintxo != null) {
-                                                                editingReviewId = myReviewForThisPintxo.id
-                                                                reviewText = myReviewForThisPintxo.text
-                                                                selectedStars = myReviewForThisPintxo.stars
+                                                            val myReview = reviews
+                                                                .filter { it.userUid == auth.currentUser?.uid && it.pintxoId == option.id }
+                                                                .maxByOrNull { it.createdAt }
+                                                            if (myReview != null) {
+                                                                editingReviewId = myReview.id
+                                                                reviewText = myReview.text
+                                                                selectedStars = myReview.stars
                                                             } else {
                                                                 editingReviewId = null
                                                                 reviewText = ""
                                                                 selectedStars = option.myStars
                                                             }
-
                                                             selectionSearch = ""
                                                             showPintxoDropdown = false
                                                         }
@@ -370,44 +403,57 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                         }
                                     }
 
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        (1..5).forEach { star ->
-                                            Icon(
-                                                imageVector = if (star <= selectedStars) Icons.Filled.Star else Icons.Outlined.StarOutline,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(
+                                            text = "Valoración",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            (1..5).forEach { star ->
+                                                Icon(
+                                                    imageVector = if (star <= selectedStars) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                                                    contentDescription = "$star estrellas",
+                                                    tint = if (star <= selectedStars) Color(0xFFFFC107)
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .clickable(
+                                                            interactionSource = remember { MutableInteractionSource() },
+                                                            indication = null
+                                                        ) { selectedStars = star }
+                                                )
+                                            }
                                         }
                                     }
-                                    Text(
-                                        text = "Se usaran las estrellas que ya diste al pintxo seleccionado.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+
                                     OutlinedTextField(
                                         value = reviewText,
                                         onValueChange = { reviewText = it },
                                         modifier = Modifier.fillMaxWidth(),
                                         minLines = 3,
                                         maxLines = 5,
-                                        keyboardOptions = KeyboardOptions(
-                                            capitalization = KeyboardCapitalization.Sentences
-                                        ),
-                                        label = { Text("Tu reseña") }
+                                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                                        label = { Text("Tu reseña") },
+                                        placeholder = { Text("Comparte tu experiencia con este pintxo...") },
+                                        shape = RoundedCornerShape(12.dp)
                                     )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Button(
-                                            onClick = { submitReview() },
-                                            enabled = !isSaving
-                                        ) {
-                                            Text(
-                                                when {
-                                                    isSaving -> "Guardando..."
-                                                    editingReviewId != null -> "Actualizar reseña"
-                                                    else -> "Publicar"
-                                                }
-                                            )
-                                        }
+
+                                    Button(
+                                        onClick = { submitReview() },
+                                        enabled = !isSaving,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text(
+                                            text = when {
+                                                isSaving -> "Guardando..."
+                                                editingReviewId != null -> "Actualizar reseña"
+                                                else -> "Publicar reseña"
+                                            },
+                                            modifier = Modifier.padding(vertical = 4.dp),
+                                            fontWeight = FontWeight.SemiBold
+                                        )
                                     }
                                 }
                             }
@@ -415,63 +461,164 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     }
 
                     item {
-                        Text("Ultimas reseñas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    }
-
-                    if (reviews.isEmpty()) {
-                        item {
-                            Text("Todavia no hay reseñas publicadas")
-                        }
-                    } else {
-                        items(reviews) { review ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Últimas reseñas",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            if (reviews.isNotEmpty()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = CircleShape
                                 ) {
-                                    Text(review.pintxoName, fontWeight = FontWeight.SemiBold)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        (1..5).forEach { idx ->
-                                            Icon(
-                                                imageVector = if (idx <= review.stars) Icons.Filled.Star else Icons.Outlined.StarOutline,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                    }
-                                    Text(review.text)
                                     Text(
-                                        text = "por ${review.userName}",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodySmall
+                                        text = "${reviews.size}",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
                         }
                     }
+
+                    if (reviews.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Todavía no hay reseñas publicadas.",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        items(reviews) { review ->
+                            ReviewCard(review = review)
+                        }
+                    }
                 }
             }
         }
+
+        AppSnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 
 @Composable
-private fun BoxWithSnack(
-    snackbarHostState: SnackbarHostState,
-    content: @Composable () -> Unit
-) {
-    androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
-        content()
-        AppSnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter)
-        )
+private fun ReviewCard(review: ReviewItem) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = CircleShape
+                        )
+                        .clip(CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (review.photoUrl.isNotBlank()) {
+                        SubcomposeAsyncImage(
+                            model = review.photoUrl,
+                            contentDescription = null,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape),
+                            error = {
+                                Text(
+                                    text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        )
+                    } else {
+                        Text(
+                            text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = review.userName,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = review.pintxoName,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    (1..5).forEach { idx ->
+                        Icon(
+                            imageVector = if (idx <= review.stars) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                            contentDescription = null,
+                            tint = if (idx <= review.stars) Color(0xFFFFC107)
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            )
+
+            Text(
+                text = review.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp
+            )
+        }
     }
 }
