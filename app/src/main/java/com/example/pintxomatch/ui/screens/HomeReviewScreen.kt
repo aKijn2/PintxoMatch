@@ -30,6 +30,8 @@ import androidx.compose.ui.draw.shadow
 import coil.compose.SubcomposeAsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Map
@@ -543,55 +545,61 @@ fun HomeReviewScreen(
                                     }
                                 )
 
-                                // LIKE label (swipe right)
-                                if (likeAlpha > 0.05f) {
-                                    androidx.compose.foundation.layout.Box(
+                                // Swipe right tint overlay (previous)
+                                if (likeAlpha > 0.01f) {
+                                    Box(
                                         modifier = Modifier
-                                            .align(Alignment.TopStart)
-                                            .padding(24.dp)
-                                            .graphicsLayer { alpha = likeAlpha }
-                                    ) {
-                                        Surface(
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                                            color = Color(0xFF00C853),
-                                            modifier = Modifier.graphicsLayer {
-                                                rotationZ = -15f
-                                            }
-                                        ) {
-                                            Text(
-                                                text = "ANTERIOR",
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                                fontWeight = FontWeight.Black,
-                                                fontSize = 18.sp,
-                                                color = Color.White
+                                            .matchParentSize()
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(
+                                                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                    colors = listOf(
+                                                        Color(0xFF00C853).copy(alpha = likeAlpha * 0.55f),
+                                                        Color.Transparent
+                                                    )
+                                                )
                                             )
-                                        }
+                                            .graphicsLayer { alpha = likeAlpha },
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Default.ArrowBack,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .padding(start = 28.dp)
+                                                .size(56.dp)
+                                                .graphicsLayer { alpha = likeAlpha.coerceIn(0f, 1f) }
+                                        )
                                     }
                                 }
 
-                                // NOPE label (swipe left)
-                                if (nopeAlpha > 0.05f) {
-                                    androidx.compose.foundation.layout.Box(
+                                // Swipe left tint overlay (next)
+                                if (nopeAlpha > 0.01f) {
+                                    Box(
                                         modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(24.dp)
-                                            .graphicsLayer { alpha = nopeAlpha }
-                                    ) {
-                                        Surface(
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.graphicsLayer {
-                                                rotationZ = 15f
-                                            }
-                                        ) {
-                                            Text(
-                                                text = "SIGUIENTE",
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                                fontWeight = FontWeight.Black,
-                                                fontSize = 18.sp,
-                                                color = Color.White
+                                            .matchParentSize()
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(
+                                                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                    colors = listOf(
+                                                        Color.Transparent,
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = nopeAlpha * 0.55f)
+                                                    )
+                                                )
                                             )
-                                        }
+                                            .graphicsLayer { alpha = nopeAlpha },
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Default.ArrowForward,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .padding(end = 28.dp)
+                                                .size(56.dp)
+                                                .graphicsLayer { alpha = nopeAlpha.coerceIn(0f, 1f) }
+                                        )
                                     }
                                 }
                             }
