@@ -15,6 +15,9 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.StarOutline
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -267,10 +270,9 @@ fun UserProfileScreen(
                         Box(
                             modifier = Modifier
                                 .size(110.dp)
-                                .border(BorderStroke(3.dp, colorPrimary), RoundedCornerShape(12.dp))
-                                .padding(4.dp)
-                                .background(colorSurface, RoundedCornerShape(8.dp))
-                                .clip(RoundedCornerShape(8.dp))
+                                .border(BorderStroke(4.dp, colorSurface), CircleShape)
+                                .clip(CircleShape)
+                                .background(colorSurface)
                         ) {
                             val avatarUrl = if (isMyProfile && selectedProfileImageUri != null) selectedProfileImageUri 
                                             else if (isMyProfile) user?.photoUrl 
@@ -316,17 +318,16 @@ fun UserProfileScreen(
                         Box(
                             modifier = Modifier
                                 .padding(bottom = 8.dp)
-                                .size(45.dp)
-                                .border(BorderStroke(2.dp, colorAccent), CircleShape)
-                                .clip(CircleShape)
-                                .background(colorContainer),
+                                .size(48.dp)
+                                .background(Brush.linearGradient(listOf(colorPrimary, colorAccent)), CircleShape)
+                                .clip(CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "$level",
-                                color = colorOnSurface,
+                                color = Color.White,
                                 fontWeight = FontWeight.Black,
-                                fontSize = 18.sp
+                                fontSize = 20.sp
                             )
                         }
                     }
@@ -446,72 +447,87 @@ fun UserProfileScreen(
                         }
                     } else {
                         // PROGRESS BLOCK
-                        Text("EXPERIENCIA PINTXO", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.StarOutline, contentDescription = null, tint = colorPrimary, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("EXPERIENCIA PINTXO", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = colorContainer),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.1f))
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
+                            Column(modifier = Modifier.padding(20.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Nivel $level", color = colorOnSurfaceVariant, fontSize = 12.sp)
-                                    Text("${totalPintxos % 5} / 5 XP", color = colorOnSurfaceVariant, fontSize = 12.sp)
+                                    Text("Nivel $level", color = colorOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    Text("${totalPintxos % 5} / 5 XP", color = colorOnSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                                 LinearProgressIndicator(
                                     progress = { progressToNextLevel },
-                                    modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(4.dp)),
+                                    modifier = Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)),
                                     color = colorPrimary,
                                     trackColor = colorOnSurface.copy(alpha = 0.1f)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text("Aporta más pintxos para subir de nivel y desbloquear insignias.", color = colorOnSurfaceVariant, fontSize = 11.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text("Aporta más pintxos para subir de nivel y desbloquear insignias especiales.", color = colorOnSurfaceVariant, fontSize = 12.sp, lineHeight = 16.sp)
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(32.dp))
 
                         // SHOWCASE SECTION
-                        Text("VITRINA DE LOGROS", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = colorPrimary, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("VITRINA DE LOGROS", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                         
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             AchievementIcon(Icons.Default.Restaurant, "Crítico", totalPintxos >= 1)
                             AchievementIcon(Icons.Default.Star, "Estrella", totalPintxos >= 5)
                             AchievementIcon(Icons.Default.LocationOn, "Ruta", totalPintxos >= 10)
                             AchievementIcon(Icons.Default.Badge, "Leyenda", totalPintxos >= 50)
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(32.dp))
 
                         // SUMMARY
-                        Text("RESUMEN", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Analytics, contentDescription = null, tint = colorPrimary, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("RESUMEN DE ACTIVIDAD", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = colorContainer),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.1f))
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
+                            Column(modifier = Modifier.padding(20.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("$totalPintxos", color = colorOnSurface, fontSize = 24.sp, fontWeight = FontWeight.Black)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text("PINTXOS COMPARTIDOS", color = colorOnSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("$totalPintxos", color = colorPrimary, fontSize = 32.sp, fontWeight = FontWeight.Black)
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Text("PINTXOS\nCOMPARTIDOS", color = colorOnSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp, lineHeight = 14.sp)
                                 }
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(20.dp))
                                 if (isMyProfile) {
                                     Button(
                                         onClick = onNavigateToUserPintxos,
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().height(48.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = colorPrimary.copy(alpha = 0.1f), contentColor = colorPrimary),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(12.dp),
                                         border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.3f))
                                     ) {
-                                        Text("GESTIONAR MIS APORTACIONES", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("GESTIONAR MIS APORTACIONES", fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
                                     }
                                 } else if (currentUserId != null) {
                                     Button(
@@ -528,25 +544,25 @@ fun UserProfileScreen(
                                                 loadingFriendAction = false
                                             }
                                         },
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().height(48.dp),
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = if (isFriend) colorContainer else colorPrimary,
                                             contentColor = if (isFriend) colorPrimary else MaterialTheme.colorScheme.onPrimary
                                         ),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(12.dp),
                                         border = BorderStroke(1.dp, if (isFriend) colorPrimary else Color.Transparent),
                                         enabled = !loadingFriendAction
                                     ) {
                                         if (loadingFriendAction) {
-                                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                                         } else {
                                             Icon(
                                                 if (isFriend) Icons.Default.Check else Icons.Default.PersonAdd,
                                                 contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
+                                                modifier = Modifier.size(20.dp)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text(if (isFriend) "Amigos" else "Añadir amigo", fontWeight = FontWeight.Bold)
+                                            Text(if (isFriend) "Amigos" else "Añadir amigo", fontWeight = FontWeight.Black, fontSize = 13.sp)
                                         }
                                     }
                                 }
@@ -572,22 +588,22 @@ fun UserProfileScreen(
 } // closes UserProfileScreen
 
 @Composable
-private fun AchievementIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, name: String, unlocked: Boolean) {
+private fun RowScope.AchievementIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, name: String, unlocked: Boolean) {
     val colorPrimary = MaterialTheme.colorScheme.primary
     val colorBackground = MaterialTheme.colorScheme.surface
     val colorOnSurface = MaterialTheme.colorScheme.onSurface
     val colorGray = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
     
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
         Box(
             modifier = Modifier
-                .size(60.dp)
-                .background(colorBackground, RoundedCornerShape(8.dp))
+                .aspectRatio(1f)
+                .background(colorBackground, RoundedCornerShape(12.dp))
                 .border(
-                    BorderStroke(1.dp, if (unlocked) colorPrimary else colorGray),
-                    RoundedCornerShape(8.dp)
+                    BorderStroke(2.dp, if (unlocked) colorPrimary.copy(alpha = 0.5f) else colorGray.copy(alpha = 0.2f)),
+                    RoundedCornerShape(12.dp)
                 )
-                .padding(12.dp),
+                .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
             Icon(
