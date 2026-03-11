@@ -1,22 +1,33 @@
 package com.example.pintxomatch.ui.screens
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import coil.compose.SubcomposeAsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
@@ -26,14 +37,11 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -50,8 +58,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pintxomatch.data.model.Pintxo
@@ -92,6 +102,7 @@ fun HomeReviewScreen(
     var isLoading by remember { mutableStateOf(true) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val userPhotoUrl = remember { auth.currentUser?.photoUrl?.toString() }
 
     fun nextPintxo() {
         if (pintxos.isEmpty()) return
@@ -233,108 +244,184 @@ fun HomeReviewScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            text = "Food View X",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateToSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "Ajustes")
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = onNavigateToProfile) {
-                            Icon(Icons.Default.Person, contentDescription = "Perfil")
-                        }
-                    }
-                )
-            },
-            bottomBar = {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding(),
-                    tonalElevation = 8.dp,
-                    shadowElevation = 10.dp,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow
+                        .statusBarsPadding(),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 2.dp
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        if (isAdmin) {
-                            Row(
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Ajustes",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = "PintxoMatch",
+                            modifier = Modifier.weight(1f),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            letterSpacing = 1.sp
+                        )
+                        IconButton(onClick = onNavigateToProfile) {
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(onClick = onNavigateToSupportInbox) {
-                                    Icon(
-                                        imageVector = Icons.Default.SupportAgent,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary
+                                    .size(34.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        shape = CircleShape
                                     )
-                                    Text(" Inbox admin")
+                                    .clip(CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                 if (!userPhotoUrl.isNullOrBlank()) {
+                                    SubcomposeAsyncImage(
+                                        model = userPhotoUrl,
+                                        contentDescription = "Perfil",
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape),
+                                        loading = {
+                                            Icon(
+                                                Icons.Default.Person,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        },
+                                        error = {
+                                            Icon(
+                                                Icons.Default.Person,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = "Perfil",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }
-
-                        NavigationBar(
-                            containerColor = Color.Transparent,
-                            tonalElevation = 0.dp,
-                            windowInsets = WindowInsets(0, 0, 0, 0)
+                    }
+                }
+            },
+            bottomBar = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(bottom = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (isAdmin) {
+                        TextButton(
+                            onClick = onNavigateToSupportInbox,
+                            modifier = Modifier.padding(bottom = 4.dp)
                         ) {
-                            NavigationBarItem(
-                                selected = selectedFooterTab == "reseñas",
-                                onClick = {
-                                    selectedFooterTab = "reseñas"
-                                    onNavigateToReviews()
-                                },
-                                icon = { Icon(Icons.Default.Edit, contentDescription = "Reseñas") },
-                                label = { Text("Reseñas") },
-                                alwaysShowLabel = false
+                            Icon(
+                                imageVector = Icons.Default.SupportAgent,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
                             )
-                            NavigationBarItem(
+                            Text(
+                                " Inbox admin",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp)
+                            .shadow(
+                                elevation = 20.dp,
+                                shape = RoundedCornerShape(32.dp),
+                                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                            )
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = RoundedCornerShape(32.dp)
+                            )
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            NavPillItem(
+                                icon = Icons.Default.Edit,
+                                label = "Reviews",
+                                selected = selectedFooterTab == "resenas",
+                                onClick = { selectedFooterTab = "resenas"; onNavigateToReviews() }
+                            )
+                            NavPillItem(
+                                icon = Icons.Default.Leaderboard,
+                                label = "Top",
                                 selected = selectedFooterTab == "ranking",
-                                onClick = {
-                                    selectedFooterTab = "ranking"
-                                    onNavigateToLeaderboard()
-                                },
-                                icon = { Icon(Icons.Default.Leaderboard, contentDescription = "Ranking") },
-                                label = { Text("Ranking") },
-                                alwaysShowLabel = false
+                                onClick = { selectedFooterTab = "ranking"; onNavigateToLeaderboard() }
                             )
-                            NavigationBarItem(
-                                selected = selectedFooterTab == "subir",
-                                onClick = {
-                                    selectedFooterTab = "subir"
-                                    onNavigateToUpload()
-                                },
-                                icon = { Icon(Icons.Default.Add, contentDescription = "Subir") },
-                                label = { Text("Subir") },
-                                alwaysShowLabel = false
-                            )
-                            NavigationBarItem(
+
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .shadow(
+                                        elevation = 6.dp,
+                                        shape = CircleShape,
+                                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                    )
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = CircleShape
+                                    )
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = { selectedFooterTab = "subir"; onNavigateToUpload() }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Subir",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+
+                            NavPillItem(
+                                icon = Icons.Default.Map,
+                                label = "Mapa",
                                 selected = selectedFooterTab == "mapa",
-                                onClick = {
-                                    selectedFooterTab = "mapa"
-                                    onNavigateToNearby()
-                                },
-                                icon = { Icon(Icons.Default.Map, contentDescription = "Mapa") },
-                                label = { Text("Mapa") },
-                                alwaysShowLabel = false
+                                onClick = { selectedFooterTab = "mapa"; onNavigateToNearby() }
                             )
-                            NavigationBarItem(
+                            NavPillItem(
+                                icon = Icons.Default.SupportAgent,
+                                label = "Soporte",
                                 selected = selectedFooterTab == "soporte",
-                                onClick = {
-                                    selectedFooterTab = "soporte"
-                                    onNavigateToSupport()
-                                },
-                                icon = { Icon(Icons.Default.SupportAgent, contentDescription = "Soporte") },
-                                label = { Text("Soporte") },
-                                alwaysShowLabel = false
+                                onClick = { selectedFooterTab = "soporte"; onNavigateToSupport() }
                             )
                         }
                     }
@@ -539,5 +626,56 @@ fun HomeReviewScreen(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.TopCenter)
         )
+    }
+}
+
+@Composable
+private fun NavPillItem(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val iconColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(durationMillis = 200),
+        label = "navIconColor"
+    )
+    val bgColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        else Color.Transparent,
+        animationSpec = tween(durationMillis = 200),
+        label = "navBgColor"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .background(color = bgColor, shape = RoundedCornerShape(20.dp))
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = iconColor,
+            modifier = Modifier.size(22.dp)
+        )
+        if (selected) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = iconColor,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
