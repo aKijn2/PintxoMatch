@@ -75,7 +75,8 @@ fun MainSwipeScreen(
     onNavigateToChat: (String) -> Unit,
     onNavigateToChatList: () -> Unit,
     onNavigateToLeaderboard: () -> Unit,
-    onNavigateToNearby: () -> Unit
+    onNavigateToNearby: () -> Unit,
+    onNavigateToPublicProfile: (String) -> Unit
 ) {
     val auth = FirebaseAuth.getInstance()
     val realtimeDb = com.google.firebase.database.FirebaseDatabase
@@ -629,7 +630,8 @@ fun MainSwipeScreen(
                             ) {
                                 PintxoCard(
                                     pintxo = topPintxo,
-                                    onRatePintxo = { stars -> submitRating(topPintxo, stars) }
+                                    onRatePintxo = { stars -> submitRating(topPintxo, stars) },
+                                    onUploaderClick = { uploaderId -> onNavigateToPublicProfile(uploaderId) }
                                 )
                             }
                         }

@@ -41,7 +41,8 @@ import java.util.Locale
 @Composable
 fun PintxoCard(
     pintxo: Pintxo,
-    onRatePintxo: ((Int) -> Unit)? = null
+    onRatePintxo: ((Int) -> Unit)? = null,
+    onUploaderClick: ((String) -> Unit)? = null
 ) {
     Box(
         modifier = Modifier
@@ -93,6 +94,27 @@ fun PintxoCard(
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 15.sp,
                 color = Color.White
+            )
+        }
+
+        // Uploader profile button (top-left)
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+                .size(48.dp)
+                .clickable { onUploaderClick?.invoke(pintxo.uploaderUid) },
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shadowElevation = 4.dp
+        ) {
+            val hasPhoto = pintxo.uploaderPhotoUrl.isNotBlank()
+            AsyncImage(
+                model = if (hasPhoto) pintxo.uploaderPhotoUrl else "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+                contentDescription = "Perfil del creador",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                alpha = if (pintxo.uploaderUid.isBlank()) 0.5f else 1f
             )
         }
 

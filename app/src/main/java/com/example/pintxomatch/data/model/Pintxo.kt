@@ -10,5 +10,8 @@ data class Pintxo(
     val imageUrl: String,      // Aquí irá la foto del pintxo
     val averageRating: Double = 0.0,
     val ratingCount: Int = 0,
-    val userRating: Int = 0
+    val userRating: Int = 0,
+    val uploaderUid: String = "",
+    val uploaderDisplayName: String = "",
+    val uploaderPhotoUrl: String = ""
 )

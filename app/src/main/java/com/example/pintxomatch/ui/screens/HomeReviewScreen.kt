@@ -80,7 +80,8 @@ fun HomeReviewScreen(
     onNavigateToNearby: () -> Unit,
     onNavigateToSupport: () -> Unit,
     onNavigateToSupportInbox: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToPublicProfile: (String) -> Unit
 ) {
     val auth = FirebaseAuth.getInstance()
     val firestore = FirebaseFirestore.getInstance()
@@ -134,7 +135,10 @@ fun HomeReviewScreen(
             imageUrl = snapshot.getString("imageUrl") ?: "",
             averageRating = averageRating,
             ratingCount = ratingCount,
-            userRating = currentUid?.let { ratings[it] } ?: 0
+            userRating = currentUid?.let { ratings[it] } ?: 0,
+            uploaderUid = snapshot.getString("uploaderUid") ?: "",
+            uploaderDisplayName = snapshot.getString("uploaderDisplayName") ?: "Usuario Anónimo",
+            uploaderPhotoUrl = snapshot.getString("uploaderPhotoUrl") ?: ""
         )
     }
 
@@ -393,7 +397,14 @@ fun HomeReviewScreen(
                                             alpha = 0.72f + 0.28f * kotlin.math.abs(dragFraction)
                                         }
                                 ) {
-                                    PintxoCard(pintxo = next, onRatePintxo = null)
+                                    PintxoCard(
+                                        pintxo = next, 
+                                        onRatePintxo = null,
+                                        onUploaderClick = { uid -> 
+                                            if (uid.isNotBlank()) onNavigateToPublicProfile(uid)
+                                            else notify("Este pintxo es antiguo y no tiene perfil asigando")
+                                        }
+                                    )
                                 }
                             }
 
@@ -438,7 +449,11 @@ fun HomeReviewScreen(
                             ) {
                                 PintxoCard(
                                     pintxo = current,
-                                    onRatePintxo = { stars -> submitRating(current, stars) }
+                                    onRatePintxo = { stars -> submitRating(current, stars) },
+                                    onUploaderClick = { uid -> 
+                                        if (uid.isNotBlank()) onNavigateToPublicProfile(uid)
+                                        else notify("Este pintxo es antiguo y no tiene perfil asignado")
+                                    }
                                 )
 
                                 // LIKE label (swipe right)

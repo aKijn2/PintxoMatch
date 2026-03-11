@@ -9,6 +9,8 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,20 +45,41 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import java.io.File
+import com.example.pintxomatch.ui.components.CommentsSection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () -> Unit) {
-    val user = AuthRepository.currentUser
+fun UserProfileScreen(
+    profileUid: String? = null,
+    onNavigateBack: () -> Unit, 
+    onNavigateToUserPintxos: () -> Unit
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val userRepository = remember { com.example.pintxomatch.data.repository.UserRepository() }
+
+    val user = AuthRepository.currentUser
+    val currentUserId = user?.uid
+    val isMyProfile = profileUid == null || profileUid == currentUserId
+    val targetUid = profileUid ?: currentUserId
+    if (targetUid == null) return
 
     // ESTADOS
     var totalPintxos by remember { mutableIntStateOf(0) }
     var isEditing by remember { mutableStateOf(false) }
     var isSavingProfile by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Estados adicionales para perfil publico
+    var publicProfile by remember { mutableStateOf<com.example.pintxomatch.data.model.LeaderboardUser?>(null) }
+    var isFriend by remember { mutableStateOf(false) }
+    var loadingFriendAction by remember { mutableStateOf(false) }
+    
+    // Nuevos estados para ajustes de comentarios y amigos
+    var friendsCount by remember { mutableIntStateOf(0) }
+    var commentsEnabled by remember { mutableStateOf(true) }
 
     LaunchedEffect(alertMessage) {
         alertMessage?.let {
@@ -115,22 +138,33 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
         }
     }
 
-    // Cargar estadísticas de Firestore
-    LaunchedEffect(user?.uid) {
-        val db = FirebaseFirestore.getInstance()
-        val uid = user?.uid
-        if (uid.isNullOrBlank()) {
-            totalPintxos = 0
-        } else {
+    // Cargar estadísticas de Firestore o perfil público
+    LaunchedEffect(targetUid) {
+        isLoading = true
+        coroutineScope.launch {
+            friendsCount = userRepository.getFriendsCount(targetUid)
+            commentsEnabled = userRepository.areCommentsEnabled(targetUid)
+        }
+        if (isMyProfile) {
+            val db = FirebaseFirestore.getInstance()
             db.collection("Pintxos")
-                .whereEqualTo("uploaderUid", uid)
+                .whereEqualTo("uploaderUid", targetUid)
                 .get()
                 .addOnSuccessListener { result ->
                     totalPintxos = result.size()
+                    isLoading = false
                 }
                 .addOnFailureListener {
                     totalPintxos = 0
+                    isLoading = false
                 }
+        } else {
+            publicProfile = userRepository.getPublicProfile(targetUid)
+            totalPintxos = publicProfile?.totalUploads ?: 0
+            if (currentUserId != null) {
+                isFriend = userRepository.isFriend(currentUserId, targetUid)
+            }
+            isLoading = false
         }
     }
 
@@ -165,8 +199,10 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                         navigationIconContentColor = colorOnSurface
                     ),
                     actions = {
-                        TextButton(onClick = { isEditing = !isEditing }) {
-                            Text(if (isEditing) "CANCELAR" else "EDITAR PERFIL", color = colorPrimary, fontWeight = FontWeight.Bold)
+                        if (isMyProfile) {
+                            TextButton(onClick = { isEditing = !isEditing }) {
+                                Text(if (isEditing) "CANCELAR" else "EDITAR PERFIL", color = colorPrimary, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 )
@@ -191,9 +227,12 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                         .fillMaxWidth()
                         .height(220.dp)
                 ) {
+                    val displayPhotoUrl = if (isMyProfile) user?.photoUrl?.toString() else publicProfile?.profileImageUrl
+                    val finalPhotoUrl = displayPhotoUrl.takeIf { !it.isNullOrBlank() } ?: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80"
+                    
                     // Banner Image (Blurred)
                     coil.compose.AsyncImage(
-                        model = user?.photoUrl ?: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80",
+                        model = finalPhotoUrl,
                         contentDescription = null,
                         modifier = Modifier
                             .fillMaxSize()
@@ -229,8 +268,11 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                                 .background(colorSurface, RoundedCornerShape(8.dp))
                                 .clip(RoundedCornerShape(8.dp))
                         ) {
+                            val avatarUrl = if (isMyProfile && selectedProfileImageUri != null) selectedProfileImageUri 
+                                            else if (isMyProfile) user?.photoUrl 
+                                            else publicProfile?.profileImageUrl
                             coil.compose.AsyncImage(
-                                model = selectedProfileImageUri ?: user?.photoUrl ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80",
+                                model = avatarUrl ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80",
                                 contentDescription = "Foto de perfil",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -243,7 +285,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                             modifier = Modifier.weight(1f).padding(bottom = 8.dp)
                         ) {
                             Text(
-                                text = user?.displayName ?: "Comidista",
+                                text = if (isMyProfile) user?.displayName ?: "Comidista" else publicProfile?.displayName ?: "Usuario",
                                 color = colorOnSurface,
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold
@@ -258,7 +300,7 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Explorador de Bares",
+                                    text = "$friendsCount Amigos",
                                     color = colorOnline,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -292,7 +334,11 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp, vertical = 16.dp)
                 ) {
-                    if (isEditing) {
+                    if (isLoading) {
+                        Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    } else if (isEditing && isMyProfile) {
                         // EDITING FORM
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -330,12 +376,28 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                                     ) { Text("Cámara") }
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Permitir comentarios", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                        Text("Otros usuarios podrán escribir en tu perfil", fontSize = 12.sp, color = colorOnSurfaceVariant)
+                                    }
+                                    Switch(
+                                        checked = commentsEnabled,
+                                        onCheckedChange = { commentsEnabled = it }
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
                                 Button(
                                     onClick = {
                                         val trimmedName = nuevoNombre.trim()
                                         if (trimmedName.isEmpty()) { alertMessage = "Nombre vacío"; return@Button }
                                         coroutineScope.launch {
                                             isSavingProfile = true
+                                            userRepository.updateCommentsEnabled(targetUid, commentsEnabled)
                                             val uploadedUrl = if (selectedProfileImageUri != null) ImageRepository.uploadImage(context, selectedProfileImageUri!!, "pintxomatch/profiles") else user?.photoUrl?.toString()
                                             val updates = userProfileChangeRequest { displayName = trimmedName; if (!uploadedUrl.isNullOrBlank()) photoUri = Uri.parse(uploadedUrl) }
                                             user?.updateProfile(updates)?.addOnSuccessListener {
@@ -412,17 +474,60 @@ fun UserProfileScreen(onNavigateBack: () -> Unit, onNavigateToUserPintxos: () ->
                                     Text("PINTXOS COMPARTIDOS", color = colorOnSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Button(
-                                    onClick = onNavigateToUserPintxos,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = colorPrimary.copy(alpha = 0.1f), contentColor = colorPrimary),
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.3f))
-                                ) {
-                                    Text("GESTIONAR MIS APORTACIONES", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                if (isMyProfile) {
+                                    Button(
+                                        onClick = onNavigateToUserPintxos,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = colorPrimary.copy(alpha = 0.1f), contentColor = colorPrimary),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.3f))
+                                    ) {
+                                        Text("GESTIONAR MIS APORTACIONES", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                } else if (currentUserId != null) {
+                                    Button(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                loadingFriendAction = true
+                                                if (isFriend) {
+                                                    val removed = userRepository.removeFriend(currentUserId, targetUid)
+                                                    if (removed) isFriend = false
+                                                } else {
+                                                    val added = userRepository.addFriend(currentUserId, targetUid)
+                                                    if (added) isFriend = true
+                                                }
+                                                loadingFriendAction = false
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isFriend) colorContainer else colorPrimary,
+                                            contentColor = if (isFriend) colorPrimary else MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, if (isFriend) colorPrimary else Color.Transparent),
+                                        enabled = !loadingFriendAction
+                                    ) {
+                                        if (loadingFriendAction) {
+                                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                        } else {
+                                            Icon(
+                                                if (isFriend) Icons.Default.Check else Icons.Default.PersonAdd,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(if (isFriend) "Amigos" else "Añadir amigo", fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        // COMMENTS
+                        CommentsSection(targetUserId = targetUid, currentUserId = currentUserId, commentsEnabled = commentsEnabled) 
                 }
             }
             Spacer(modifier = Modifier.height(50.dp))

@@ -20,7 +20,10 @@ class PintxoRepository {
                     barName = doc.getString("bar") ?: "",
                     location = doc.getString("ubicacion") ?: "",
                     price = doc.getDouble("precio") ?: 0.0,
-                    imageUrl = doc.getString("imageUrl") ?: ""
+                    imageUrl = doc.getString("imageUrl") ?: "",
+                    uploaderUid = doc.getString("uploaderUid") ?: "",
+                    uploaderDisplayName = doc.getString("uploaderDisplayName") ?: "Usuario Anónimo",
+                    uploaderPhotoUrl = doc.getString("uploaderPhotoUrl") ?: ""
                 )
             }
         } catch (e: Exception) {
@@ -53,7 +56,10 @@ class PintxoRepository {
                     imageUrl = doc.getString("imageUrl") ?: "",
                     averageRating = averageRating,
                     ratingCount = ratingCount,
-                    userRating = ratings[uid] ?: 0
+                    userRating = ratings[uid] ?: 0,
+                    uploaderUid = doc.getString("uploaderUid") ?: "",
+                    uploaderDisplayName = doc.getString("uploaderDisplayName") ?: "Usuario Anónimo",
+                    uploaderPhotoUrl = doc.getString("uploaderPhotoUrl") ?: ""
                 )
             }
         } catch (e: Exception) {

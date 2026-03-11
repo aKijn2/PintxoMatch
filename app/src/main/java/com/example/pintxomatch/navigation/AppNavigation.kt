@@ -65,7 +65,8 @@ fun AppNavigation(
                 onNavigateToNearby = { navController.navigate("nearby_restaurants") },
                 onNavigateToSupport = { navController.navigate("support") },
                 onNavigateToSupportInbox = { navController.navigate("support_inbox") },
-                onNavigateToSettings = { navController.navigate("settings") }
+                onNavigateToSettings = { navController.navigate("settings") },
+                onNavigateToPublicProfile = { uid -> navController.navigate("public_profile/$uid") }
             )
         }
 
@@ -161,6 +162,15 @@ fun AppNavigation(
                         popUpTo("home") { inclusive = true }
                     }
                 }
+            )
+        }
+
+        composable("public_profile/{uid}") { backStackEntry ->
+            val uid = backStackEntry.arguments?.getString("uid") ?: return@composable
+            UserProfileScreen(
+                profileUid = uid,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
             )
         }
     }
