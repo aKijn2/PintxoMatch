@@ -660,7 +660,7 @@ private fun MapStageCard(
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Text(
-                        text = "$totalResults lugares",
+                        text = "$totalResults ${if (totalResults == 1) "lugar" else "lugares"}",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         style = MaterialTheme.typography.labelMedium,
