@@ -11,6 +11,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -345,52 +349,77 @@ fun UserProfileScreen(
                             colors = CardDefaults.cardColors(containerColor = colorContainer),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text("CONFIGURACIÓN DEL PERFIL", color = colorPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.height(16.dp))
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Settings, contentDescription = null, tint = colorPrimary, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("CONFIGURACIÓN DEL PERFIL", color = colorPrimary, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                                }
+                                Spacer(modifier = Modifier.height(24.dp))
                                 OutlinedTextField(
                                     value = nuevoNombre,
                                     onValueChange = { nuevoNombre = it },
-                                    label = { Text("Nombre real") },
+                                    label = { Text("Nombre de usuario", color = colorOnSurfaceVariant) },
+                                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = colorOnSurfaceVariant) },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colorPrimary,
+                                        unfocusedBorderColor = colorOnSurfaceVariant.copy(alpha = 0.3f)
+                                    ),
+                                    singleLine = true
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Spacer(modifier = Modifier.height(24.dp))
+                                Text("Foto de perfil", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colorOnSurface)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Button(
                                         onClick = { pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.weight(1f).height(48.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = colorSurface, contentColor = colorOnSurface),
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.2f))
-                                    ) { Text("Galería") }
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.2f)),
+                                        contentPadding = PaddingValues(horizontal = 8.dp)
+                                    ) { 
+                                        Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp), tint = colorPrimary)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Galería", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) 
+                                    }
                                     Button(
                                         onClick = { 
                                             val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
                                             if (hasPerm) launchCameraCapture() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                                         },
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.weight(1f).height(48.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = colorSurface, contentColor = colorOnSurface),
-                                        shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.2f))
-                                    ) { Text("Cámara") }
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.2f)),
+                                        contentPadding = PaddingValues(horizontal = 8.dp)
+                                    ) { 
+                                        Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp), tint = colorPrimary)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Cámara", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) 
+                                    }
                                 }
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(24.dp))
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                    modifier = Modifier.fillMaxWidth().background(colorContainer, RoundedCornerShape(12.dp)).border(1.dp, colorOnSurfaceVariant.copy(alpha = 0.15f), RoundedCornerShape(12.dp)).padding(16.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Column {
-                                        Text("Permitir comentarios", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                        Text("Otros usuarios podrán escribir en tu perfil", fontSize = 12.sp, color = colorOnSurfaceVariant)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Permitir comentarios", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = colorOnSurface)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("Otros usuarios podrán escribir en tu tablón", fontSize = 12.sp, color = colorOnSurfaceVariant, lineHeight = 16.sp)
                                     }
+                                    Spacer(modifier = Modifier.width(16.dp))
                                     Switch(
                                         checked = commentsEnabled,
-                                        onCheckedChange = { commentsEnabled = it }
+                                        onCheckedChange = { commentsEnabled = it },
+                                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = colorPrimary)
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(32.dp))
                                 Button(
                                     onClick = {
                                         val trimmedName = nuevoNombre.trim()
@@ -405,13 +434,13 @@ fun UserProfileScreen(
                                             }
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().height(52.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = colorPrimary, contentColor = MaterialTheme.colorScheme.onPrimary),
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(12.dp),
                                     enabled = !isSavingProfile
                                 ) {
-                                    if (isSavingProfile) CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary)
-                                    else Text("GUARDAR CAMBIOS", fontWeight = FontWeight.Bold)
+                                    if (isSavingProfile) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                                    else Text("GUARDAR CAMBIOS", fontWeight = FontWeight.Black, fontSize = 14.sp, letterSpacing = 1.sp)
                                 }
                             }
                         }
