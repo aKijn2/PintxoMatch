@@ -66,6 +66,11 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlin.math.absoluteValue
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.runtime.mutableIntStateOf
+import kotlin.random.Random
+import androidx.compose.animation.core.Animatable
 
 private data class HomeRatingUpdate(
     val averageRating: Double,
@@ -96,6 +101,60 @@ fun HomeReviewScreen(
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val userPhotoUrl = remember { auth.currentUser?.photoUrl?.toString() }
+
+    @Composable
+    fun StarBurstEffect(trigger: Int) {
+        if (trigger == 0) return
+
+        val progress = remember { Animatable(0f) }
+
+        // Re-run the animation every time the trigger number changes
+        LaunchedEffect(trigger) {
+            progress.snapTo(0f)
+            progress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 800, easing = LinearOutSlowInEasing)
+            )
+        }
+
+        // Generate random trajectories and sizes for 6 stars
+        val stars = remember(trigger) {
+            List(6) {
+                val randomX = Random.nextInt(-200, 200).toFloat() // Spread left/right
+                val randomY = Random.nextInt(100, 300).toFloat()  // Float upwards
+                val scale = Random.nextFloat() * 0.8f + 0.5f      // Random sizes
+                Triple(randomX, randomY, scale)
+            }
+        }
+
+        // Draw the stars as long as the animation hasn't finished
+        if (progress.value < 1f) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                stars.forEach { (endX, endY, baseScale) ->
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD700), // Gold color
+                        modifier = Modifier
+                            .size(36.dp)
+                            .graphicsLayer {
+                                // Move outwards and upwards
+                                translationX = endX * progress.value
+                                translationY = -endY * progress.value
+
+                                // Pop in size, then shrink as it flies
+                                val currentScale = baseScale * (1f - progress.value) * 1.5f
+                                scaleX = currentScale
+                                scaleY = currentScale
+
+                                // Fade out gracefully
+                                alpha = 1f - progress.value
+                            }
+                    )
+                }
+            }
+        }
+    }
 
     fun notify(message: String) {
         alertMessage = message
@@ -442,14 +501,16 @@ fun HomeReviewScreen(
                                 .weight(1f)
                         ) { page ->
                             val current = pintxos[page]
+
+                            // 1. Create a trigger state for this specific card
+                            var starBurstTrigger by remember { mutableIntStateOf(0) }
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer {
-                                        // Animate Scale and Alpha based on swipe offset
                                         val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
                                         val absOffset = pageOffset.absoluteValue
-
                                         val scale = 0.85f + (0.15f * (1f - absOffset.coerceIn(0f, 1f)))
                                         val alpha = 0.5f + (0.5f * (1f - absOffset.coerceIn(0f, 1f)))
 
@@ -461,12 +522,19 @@ fun HomeReviewScreen(
                             ) {
                                 PintxoCard(
                                     pintxo = current,
-                                    onRatePintxo = { stars -> submitRating(current, stars) },
+                                    onRatePintxo = { stars ->
+                                        submitRating(current, stars)
+                                        // 2. Increment the trigger when rated!
+                                        starBurstTrigger++
+                                    },
                                     onUploaderClick = { uid ->
                                         if (uid.isNotBlank()) onNavigateToPublicProfile(uid)
                                         else notify("Este pintxo es antiguo y no tiene perfil asignado")
                                     }
                                 )
+
+                                // 3. Place the effect overlay on top of the card
+                                StarBurstEffect(trigger = starBurstTrigger)
                             }
                         }
                     }
