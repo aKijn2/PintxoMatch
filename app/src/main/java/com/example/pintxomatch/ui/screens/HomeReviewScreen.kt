@@ -1,14 +1,9 @@
 package com.example.pintxomatch.ui.screens
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,19 +14,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import coil.compose.SubcomposeAsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Map
@@ -54,18 +45,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.SubcomposeAsyncImage
 import com.example.pintxomatch.data.model.Pintxo
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
@@ -73,7 +65,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 
 private data class HomeRatingUpdate(
     val averageRating: Double,
@@ -99,22 +91,11 @@ fun HomeReviewScreen(
     val firestore = FirebaseFirestore.getInstance()
 
     var pintxos by remember { mutableStateOf<List<Pintxo>>(emptyList()) }
-    var currentIndex by remember { mutableStateOf(0) }
     var selectedFooterTab by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val userPhotoUrl = remember { auth.currentUser?.photoUrl?.toString() }
-
-    fun nextPintxo() {
-        if (pintxos.isEmpty()) return
-        currentIndex = if (currentIndex >= pintxos.lastIndex) 0 else currentIndex + 1
-    }
-
-    fun previousPintxo() {
-        if (pintxos.isEmpty()) return
-        currentIndex = if (currentIndex <= 0) pintxos.lastIndex else currentIndex - 1
-    }
 
     fun notify(message: String) {
         alertMessage = message
@@ -163,7 +144,6 @@ fun HomeReviewScreen(
             .get()
             .addOnSuccessListener { result ->
                 pintxos = result.map { doc -> mapDocumentToPintxo(doc, currentUid) }
-                currentIndex = 0
                 isLoading = false
             }
             .addOnFailureListener {
@@ -286,7 +266,7 @@ fun HomeReviewScreen(
                                     .clip(CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                 if (!userPhotoUrl.isNullOrBlank()) {
+                                if (!userPhotoUrl.isNullOrBlank()) {
                                     SubcomposeAsyncImage(
                                         model = userPhotoUrl,
                                         contentDescription = "Perfil",
@@ -434,7 +414,7 @@ fun HomeReviewScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (isLoading) {
@@ -447,181 +427,45 @@ fun HomeReviewScreen(
                         }
                     }
                 } else {
-                    val safeIndex = currentIndex.coerceIn(0, pintxos.lastIndex)
-                    val current = pintxos[safeIndex]
-                    val next = pintxos.getOrNull(if (safeIndex + 1 <= pintxos.lastIndex) safeIndex + 1 else 0)
-
-                    val swipeOffsetX = remember(current.id) { Animatable(0f) }
-                    val coroutineScope = rememberCoroutineScope()
-                    val springSpec = spring<Float>(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    )
-
-                    // Derived visual values from drag offset
-                    val dragFraction = (swipeOffsetX.value / 500f).coerceIn(-1f, 1f)
-                    val cardRotation = swipeOffsetX.value / 22f
-                    val likeAlpha = (dragFraction).coerceAtLeast(0f)
-                    val nopeAlpha = (-dragFraction).coerceAtLeast(0f)
-                    // Next card scales up as current card is dragged away
-                    val nextCardScale = 0.88f + (0.12f * kotlin.math.abs(dragFraction))
+                    val pagerState = rememberPagerState(pageCount = { pintxos.size })
 
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Next card (behind, smaller)
-                            if (next != null && next.id != current.id) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .graphicsLayer {
-                                            scaleX = nextCardScale
-                                            scaleY = nextCardScale
-                                            alpha = 0.72f + 0.28f * kotlin.math.abs(dragFraction)
-                                        }
-                                ) {
-                                    PintxoCard(
-                                        pintxo = next, 
-                                        onRatePintxo = null,
-                                        onUploaderClick = { uid -> 
-                                            if (uid.isNotBlank()) onNavigateToPublicProfile(uid)
-                                            else notify("Este pintxo es antiguo y no tiene perfil asigando")
-                                        }
-                                    )
-                                }
-                            }
-
-                            // Current card (on top)
+                        VerticalPager(
+                            state = pagerState,
+                            pageSpacing = 16.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) { page ->
+                            val current = pintxos[page]
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
+                                    .fillMaxSize()
                                     .graphicsLayer {
-                                        translationX = swipeOffsetX.value
-                                        rotationZ = cardRotation
-                                    }
-                                    .pointerInput(current.id) {
-                                        detectDragGestures(
-                                            onDrag = { change, dragAmount ->
-                                                change.consume()
-                                                coroutineScope.launch {
-                                                    swipeOffsetX.snapTo(swipeOffsetX.value + dragAmount.x)
-                                                }
-                                            },
-                                            onDragEnd = {
-                                                coroutineScope.launch {
-                                                    val threshold = 200f
-                                                    when {
-                                                        swipeOffsetX.value > threshold -> {
-                                                            swipeOffsetX.animateTo(1200f)
-                                                            previousPintxo()
-                                                            swipeOffsetX.snapTo(0f)
-                                                        }
-                                                        swipeOffsetX.value < -threshold -> {
-                                                            swipeOffsetX.animateTo(-1200f)
-                                                            nextPintxo()
-                                                            swipeOffsetX.snapTo(0f)
-                                                        }
-                                                        else -> {
-                                                            swipeOffsetX.animateTo(0f, springSpec)
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
+                                        // Animate Scale and Alpha based on swipe offset
+                                        val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                                        val absOffset = pageOffset.absoluteValue
+
+                                        val scale = 0.85f + (0.15f * (1f - absOffset.coerceIn(0f, 1f)))
+                                        val alpha = 0.5f + (0.5f * (1f - absOffset.coerceIn(0f, 1f)))
+
+                                        scaleX = scale
+                                        scaleY = scale
+                                        this.alpha = alpha
+                                    },
+                                contentAlignment = Alignment.Center
                             ) {
                                 PintxoCard(
                                     pintxo = current,
                                     onRatePintxo = { stars -> submitRating(current, stars) },
-                                    onUploaderClick = { uid -> 
+                                    onUploaderClick = { uid ->
                                         if (uid.isNotBlank()) onNavigateToPublicProfile(uid)
                                         else notify("Este pintxo es antiguo y no tiene perfil asignado")
                                     }
-                                )
-
-                                // Swipe right tint overlay (previous)
-                                if (likeAlpha > 0.01f) {
-                                    Box(
-                                        modifier = Modifier
-                                            .matchParentSize()
-                                            .clip(RoundedCornerShape(20.dp))
-                                            .background(
-                                                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                                    colors = listOf(
-                                                        Color(0xFF00C853).copy(alpha = likeAlpha * 0.55f),
-                                                        Color.Transparent
-                                                    )
-                                                )
-                                            )
-                                            .graphicsLayer { alpha = likeAlpha },
-                                        contentAlignment = Alignment.CenterStart
-                                    ) {
-                                        Icon(
-                                            imageVector = androidx.compose.material.icons.Icons.Default.ArrowBack,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier
-                                                .padding(start = 28.dp)
-                                                .size(56.dp)
-                                                .graphicsLayer { alpha = likeAlpha.coerceIn(0f, 1f) }
-                                        )
-                                    }
-                                }
-
-                                // Swipe left tint overlay (next)
-                                if (nopeAlpha > 0.01f) {
-                                    Box(
-                                        modifier = Modifier
-                                            .matchParentSize()
-                                            .clip(RoundedCornerShape(20.dp))
-                                            .background(
-                                                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                                    colors = listOf(
-                                                        Color.Transparent,
-                                                        MaterialTheme.colorScheme.primary.copy(alpha = nopeAlpha * 0.55f)
-                                                    )
-                                                )
-                                            )
-                                            .graphicsLayer { alpha = nopeAlpha },
-                                        contentAlignment = Alignment.CenterEnd
-                                    ) {
-                                        Icon(
-                                            imageVector = androidx.compose.material.icons.Icons.Default.ArrowForward,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier
-                                                .padding(end = 28.dp)
-                                                .size(56.dp)
-                                                .graphicsLayer { alpha = nopeAlpha.coerceIn(0f, 1f) }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Dot progress indicators
-                        val visibleDots = minOf(pintxos.size, 7)
-                        val startIndex = (safeIndex - visibleDots / 2).coerceIn(0, (pintxos.size - visibleDots).coerceAtLeast(0))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            (startIndex until startIndex + visibleDots).forEach { i ->
-                                val isActive = i == safeIndex
-                                Box(
-                                    modifier = Modifier
-                                        .size(if (isActive) 10.dp else 6.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (isActive) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                                        )
                                 )
                             }
                         }
