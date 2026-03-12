@@ -1,7 +1,10 @@
 package com.example.pintxomatch.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,15 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
@@ -50,11 +57,12 @@ fun SettingsScreen(
     onLogout: () -> Unit
 ) {
     val user = AuthRepository.currentUser
-    val coroutineScope = rememberCoroutineScope()
     var notificationsEnabled by remember { mutableStateOf(true) }
+    var reviewNotificationsEnabled by remember { mutableStateOf(true) }
+    var supportNotificationsEnabled by remember { mutableStateOf(true) }
+    var notificationOptionsExpanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deletePassword by remember { mutableStateOf("") }
-    var alertMessage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -68,146 +76,160 @@ fun SettingsScreen(
             )
         }
     ) { padding ->
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
+            val isWideLayout = maxWidth >= 600.dp
 
-            // Account card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .widthIn(max = 760.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Account card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    Surface(
-                        modifier = Modifier.size(56.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        if (!user?.photoUrl?.toString().isNullOrBlank()) {
-                            AsyncImage(
-                                model = user?.photoUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape)
-                            )
-                        } else {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.Person,
+                        Surface(
+                            modifier = Modifier.size(56.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            if (!user?.photoUrl?.toString().isNullOrBlank()) {
+                                AsyncImage(
+                                    model = user?.photoUrl,
                                     contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape)
                                 )
+                            } else {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(28.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = user?.displayName?.takeIf { it.isNotBlank() }
-                                ?: user?.email?.substringBefore("@")
-                                ?: "Usuario",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            text = user?.email ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = user?.displayName?.takeIf { it.isNotBlank() }
+                                    ?: user?.email?.substringBefore("@")
+                                    ?: "Usuario",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                            Text(
+                                text = user?.email ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
-            }
 
-            // General section
-            SettingsGroup(title = "General") {
-                SettingsToggleRow(
-                    icon = Icons.Default.Notifications,
-                    label = "Notificaciones",
-                    checked = notificationsEnabled,
-                    onCheckedChange = { notificationsEnabled = it }
-                )
-            }
+                // General section
+                SettingsGroup(title = "General") {
+                    NotificationPreferencesCard(
+                        notificationsEnabled = notificationsEnabled,
+                        onNotificationsEnabledChange = { notificationsEnabled = it },
+                        reviewNotificationsEnabled = reviewNotificationsEnabled,
+                        onReviewNotificationsEnabledChange = { reviewNotificationsEnabled = it },
+                        supportNotificationsEnabled = supportNotificationsEnabled,
+                        onSupportNotificationsEnabledChange = { supportNotificationsEnabled = it },
+                        optionsExpanded = notificationOptionsExpanded,
+                        onOptionsExpandedChange = { notificationOptionsExpanded = it },
+                        isWideLayout = isWideLayout
+                    )
+                }
 
-            // Account section
-            SettingsGroup(title = "Cuenta") {
-                SettingsActionRow(
-                    icon = Icons.Default.Person,
-                    label = "Ver perfil",
-                    onClick = onNavigateToProfile
-                )
-                HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
-                SettingsActionRow(
-                    icon = Icons.Default.SupportAgent,
-                    label = "Soporte",
-                    onClick = onNavigateToSupport
-                )
-            }
+                // Account section
+                SettingsGroup(title = "Cuenta") {
+                    SettingsActionRow(
+                        icon = Icons.Default.Person,
+                        label = "Ver perfil",
+                        onClick = onNavigateToProfile
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+                    SettingsActionRow(
+                        icon = Icons.Default.SupportAgent,
+                        label = "Soporte",
+                        onClick = onNavigateToSupport
+                    )
+                }
 
-            // App info section
-            SettingsGroup(title = "Aplicación") {
-                SettingsInfoRow(
-                    icon = Icons.Default.Info,
-                    label = "Versión",
-                    value = "1.0.0"
-                )
-            }
+                // App info section
+                SettingsGroup(title = "Aplicación") {
+                    SettingsInfoRow(
+                        icon = Icons.Default.Info,
+                        label = "Versión",
+                        value = "1.0.0"
+                    )
+                }
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                onClick = onLogout,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    onClick = onLogout,
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                    )
                 ) {
-                    Icon(
-                        Icons.Default.Logout,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                    Text(
-                        text = "Cerrar sesión",
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.weight(1f)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Logout,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = "Cerrar sesión",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // Delete Account (Danger Zone)
+                SettingsGroup(title = "Zona Peligrosa") {
+                    SettingsActionRow(
+                        icon = Icons.Default.Delete,
+                        label = "Eliminar mi cuenta definitivamente",
+                        textColor = MaterialTheme.colorScheme.error,
+                        onClick = { showDeleteDialog = true }
                     )
                 }
-            }
 
-            // Delete Account (Danger Zone)
-            SettingsGroup(title = "Zona Peligrosa") {
-                SettingsActionRow(
-                    icon = Icons.Default.Delete,
-                    label = "Eliminar mi cuenta definitivamente",
-                    textColor = MaterialTheme.colorScheme.error,
-                    onClick = { showDeleteDialog = true }
-                )
+                Spacer(modifier = Modifier.height(16.dp))
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 
@@ -352,6 +374,175 @@ private fun SettingsToggleRow(
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
         Text(text = label, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun NotificationPreferencesCard(
+    notificationsEnabled: Boolean,
+    onNotificationsEnabledChange: (Boolean) -> Unit,
+    reviewNotificationsEnabled: Boolean,
+    onReviewNotificationsEnabledChange: (Boolean) -> Unit,
+    supportNotificationsEnabled: Boolean,
+    onSupportNotificationsEnabledChange: (Boolean) -> Unit,
+    optionsExpanded: Boolean,
+    onOptionsExpandedChange: (Boolean) -> Unit,
+    isWideLayout: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOptionsExpandedChange(!optionsExpanded) }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Icon(
+                Icons.Default.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            Text(
+                text = "Notificaciones",
+                modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.Medium
+            )
+            Icon(
+                imageVector = if (optionsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (optionsExpanded) "Ocultar opciones" else "Mostrar opciones",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+            Switch(
+                checked = notificationsEnabled,
+                onCheckedChange = {
+                    onNotificationsEnabledChange(it)
+                    if (it) onOptionsExpandedChange(true) else onOptionsExpandedChange(false)
+                }
+            )
+        }
+
+        if (!notificationsEnabled) {
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+            Text(
+                text = "Activa las notificaciones para recibir avisos de reseñas y soporte.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+            return
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+
+        AnimatedVisibility(visible = optionsExpanded) {
+            if (isWideLayout) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    NotificationOptionTile(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Notifications,
+                        title = "Reseñas y actividad",
+                        subtitle = "Avisos cuando haya movimiento en tus valoraciones.",
+                        checked = reviewNotificationsEnabled,
+                        onCheckedChange = onReviewNotificationsEnabledChange
+                    )
+                    NotificationOptionTile(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.SupportAgent,
+                        title = "Mensajes de soporte",
+                        subtitle = "Respuestas nuevas en tus tickets.",
+                        checked = supportNotificationsEnabled,
+                        onCheckedChange = onSupportNotificationsEnabledChange
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    NotificationOptionTile(
+                        modifier = Modifier.fillMaxWidth(),
+                        icon = Icons.Default.Notifications,
+                        title = "Reseñas y actividad",
+                        subtitle = "Avisos cuando haya movimiento en tus valoraciones.",
+                        checked = reviewNotificationsEnabled,
+                        onCheckedChange = onReviewNotificationsEnabledChange
+                    )
+                    NotificationOptionTile(
+                        modifier = Modifier.fillMaxWidth(),
+                        icon = Icons.Default.SupportAgent,
+                        title = "Mensajes de soporte",
+                        subtitle = "Respuestas nuevas en tus tickets.",
+                        checked = supportNotificationsEnabled,
+                        onCheckedChange = onSupportNotificationsEnabledChange
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationOptionTile(
+    modifier: Modifier,
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(18.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
     }
 }
 
