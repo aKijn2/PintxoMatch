@@ -190,436 +190,544 @@ fun UserProfileScreen(
     val progressToNextLevel = (totalPintxos % 5) / 5f
 
     Box(modifier = Modifier.fillMaxSize().background(colorBackground)) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = { Text("PERFIL DE LA COMUNIDAD", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp) },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, "Volver")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = colorBackground.copy(alpha = 0.9f),
-                        titleContentColor = colorOnSurface,
-                        navigationIconContentColor = colorOnSurface
-                    ),
-                    actions = {
-                        if (isMyProfile) {
-                            TextButton(onClick = { isEditing = !isEditing }) {
-                                Text(if (isEditing) "CANCELAR" else "EDITAR PERFIL", color = colorPrimary, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                )
-            }
-        ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
+        // CONTENT
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 800.dp)
             ) {
-                // Responsive container (max 600dp for tablets)
-                Column(
-                    modifier = Modifier
-                        .widthIn(max = 600.dp)
-                        .fillMaxWidth()
-                ) {
-                // 1. BANNER & AVATAR SECTION
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                ) {
-                    val displayPhotoUrl = if (isMyProfile) user?.photoUrl?.toString() else publicProfile?.profileImageUrl
-                    val finalPhotoUrl = displayPhotoUrl.takeIf { !it.isNullOrBlank() } ?: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80"
-                    
-                    // Banner Image (Blurred)
-                    coil.compose.AsyncImage(
-                        model = finalPhotoUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .blur(30.dp),
-                        contentScale = ContentScale.Crop
-                    )
-                    
-                    // Gradient overlay
+                val isWide = maxWidth > 600.dp
+                
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // 1. IMMERSIVE HEADER SECTION
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, colorBackground),
-                                    startY = 100f
-                                )
-                            )
-                    )
-
-                    // Profile Content Row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalAlignment = Alignment.Bottom
+                            .fillMaxWidth()
+                            .height(if (isWide) 320.dp else 280.dp)
                     ) {
-                        // Avatar with Custom Frame
+                        val displayPhotoUrl = if (isMyProfile) user?.photoUrl?.toString() else publicProfile?.profileImageUrl
+                        val finalPhotoUrl = displayPhotoUrl.takeIf { !it.isNullOrBlank() } ?: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=1200&q=80"
+                        
+                        // Banner Image (Blurred & Darkened)
+                        coil.compose.AsyncImage(
+                            model = finalPhotoUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        
+                        // Dual Gradient Overlay for depth
                         Box(
                             modifier = Modifier
-                                .size(110.dp)
-                                .border(BorderStroke(4.dp, colorSurface), CircleShape)
-                                .clip(CircleShape)
-                                .background(colorSurface)
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Black.copy(alpha = 0.4f),
+                                            Color.Transparent,
+                                            colorBackground
+                                        )
+                                    )
+                                )
+                        )
+
+                        // Top Bar Actions (Floating over banner)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp, start = 8.dp, end = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val avatarUrl = if (isMyProfile && selectedProfileImageUri != null) selectedProfileImageUri 
-                                            else if (isMyProfile) user?.photoUrl 
-                                            else publicProfile?.profileImageUrl
-                            coil.compose.AsyncImage(
-                                model = avatarUrl ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80",
-                                contentDescription = "Foto de perfil",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
+                            IconButton(
+                                onClick = onNavigateBack,
+                                modifier = Modifier.background(Color.Black.copy(alpha = 0.2f), CircleShape)
+                            ) {
+                                Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White)
+                            }
+                            
+                            if (isMyProfile) {
+                                Surface(
+                                    onClick = { isEditing = !isEditing },
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = Color.Black.copy(alpha = 0.3f),
+                                    contentColor = Color.White
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(if (isEditing) "LISTO" else "AJUSTES", fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                                    }
+                                }
+                            }
                         }
 
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        Column(
-                            modifier = Modifier.weight(1f).padding(bottom = 8.dp)
+                        // Identity Card (Overlapping Banner)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .offset(y = 40.dp)
+                                .padding(horizontal = 24.dp)
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            contentAlignment = Alignment.CenterStart
                         ) {
-                            Text(
-                                text = if (isMyProfile) user?.displayName ?: "Comidista" else publicProfile?.displayName ?: "Usuario",
-                                color = colorOnSurface,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Glass Background Layer (Blurred & Transparent)
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .blur(if (android.os.Build.VERSION.SDK_INT >= 31) 12.dp else 0.dp),
+                                shape = RoundedCornerShape(32.dp),
+                                color = colorSurface.copy(alpha = 0.8f),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                            ) {}
+
+                            Row(
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Avatar with status ring
                                 Box(
                                     modifier = Modifier
-                                        .size(10.dp)
+                                        .size(80.dp)
+                                        .padding(2.dp)
+                                        .border(2.dp, colorPrimary, CircleShape)
                                         .clip(CircleShape)
-                                        .background(colorOnline)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "$friendsCount Amigos",
-                                    color = colorOnline,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        // Level Badge
-                        Box(
-                            modifier = Modifier
-                                .padding(bottom = 8.dp)
-                                .size(48.dp)
-                                .background(Brush.linearGradient(listOf(colorPrimary, colorAccent)), CircleShape)
-                                .clip(CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "$level",
-                                color = Color.White,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 20.sp
-                            )
-                        }
-                    }
-                }
-
-                // 2. MAIN CONTENT AREA
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
-                ) {
-                    if (isLoading) {
-                        Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    } else if (isEditing && isMyProfile) {
-                        // EDITING FORM
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = colorContainer),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Settings, contentDescription = null, tint = colorPrimary, modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("CONFIGURACIÓN DEL PERFIL", color = colorPrimary, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
-                                }
-                                Spacer(modifier = Modifier.height(24.dp))
-                                OutlinedTextField(
-                                    value = nuevoNombre,
-                                    onValueChange = { nuevoNombre = it },
-                                    label = { Text("Nombre de usuario", color = colorOnSurfaceVariant) },
-                                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = colorOnSurfaceVariant) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = colorPrimary,
-                                        unfocusedBorderColor = colorOnSurfaceVariant.copy(alpha = 0.3f)
-                                    ),
-                                    singleLine = true
-                                )
-                                Spacer(modifier = Modifier.height(24.dp))
-                                Text("Foto de perfil", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colorOnSurface)
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Button(
-                                        onClick = { pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                                        modifier = Modifier.weight(1f).height(48.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = colorSurface, contentColor = colorOnSurface),
-                                        shape = RoundedCornerShape(12.dp),
-                                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.2f)),
-                                        contentPadding = PaddingValues(horizontal = 8.dp)
-                                    ) { 
-                                        Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp), tint = colorPrimary)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Galería", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) 
-                                    }
-                                    Button(
-                                        onClick = { 
-                                            val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                                            if (hasPerm) launchCameraCapture() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                                        },
-                                        modifier = Modifier.weight(1f).height(48.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = colorSurface, contentColor = colorOnSurface),
-                                        shape = RoundedCornerShape(12.dp),
-                                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.2f)),
-                                        contentPadding = PaddingValues(horizontal = 8.dp)
-                                    ) { 
-                                        Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp), tint = colorPrimary)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Cámara", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) 
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(24.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().background(colorContainer, RoundedCornerShape(12.dp)).border(1.dp, colorOnSurfaceVariant.copy(alpha = 0.15f), RoundedCornerShape(12.dp)).padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                        .background(colorSurface)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Permitir comentarios", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = colorOnSurface)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text("Otros usuarios podrán escribir en tu tablón", fontSize = 12.sp, color = colorOnSurfaceVariant, lineHeight = 16.sp)
-                                    }
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                    Switch(
-                                        checked = commentsEnabled,
-                                        onCheckedChange = { commentsEnabled = it },
-                                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = colorPrimary)
+                                    val avatarUrl = if (isMyProfile && selectedProfileImageUri != null) selectedProfileImageUri 
+                                                    else if (isMyProfile) user?.photoUrl 
+                                                    else publicProfile?.profileImageUrl
+                                    coil.compose.AsyncImage(
+                                        model = avatarUrl ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80",
+                                        contentDescription = "Foto de perfil",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(32.dp))
-                                Button(
-                                    onClick = {
-                                        val trimmedName = nuevoNombre.trim()
-                                        if (trimmedName.isEmpty()) { alertMessage = "Nombre vacío"; return@Button }
+
+                                Spacer(modifier = Modifier.width(20.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isMyProfile) user?.displayName ?: "Comidista" else publicProfile?.displayName ?: "Usuario",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Black,
+                                        color = colorOnSurface
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.PersonAdd, 
+                                            contentDescription = null, 
+                                            modifier = Modifier.size(12.dp), 
+                                            tint = colorOnSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "$friendsCount Amigos",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Medium,
+                                            color = colorOnSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+
+                                // Level Orb
+                                Column(
+                                    modifier = Modifier.padding(end = 4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .background(
+                                                Brush.linearGradient(listOf(colorPrimary, colorAccent)),
+                                                CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("$level", color = Color.White, fontWeight = FontWeight.Black, fontSize = 24.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("NIVEL", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = colorPrimary, letterSpacing = 0.5.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(60.dp)) // Extra space for the overlapping card
+
+                    // 2. MAIN CONTENT AREA
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                    ) {
+                        if (isLoading) {
+                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = colorPrimary)
+                            }
+                        } else if (isEditing && isMyProfile) {
+                            // MODERN EDITING FORM
+                            EditProfileForm(
+                                nuevoNombre = nuevoNombre,
+                                onNombreChange = { nuevoNombre = it },
+                                selectedUri = selectedProfileImageUri,
+                                commentsEnabled = commentsEnabled,
+                                onCommentsToggle = { commentsEnabled = it },
+                                isSaving = isSavingProfile,
+                                onPickMedia = { pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                                onLaunchCamera = { 
+                                    val hasPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                                    if (hasPerm) launchCameraCapture() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                },
+                                onSave = {
+                                    val trimmedName = nuevoNombre.trim()
+                                    if (trimmedName.isEmpty()) { alertMessage = "Nombre vacío"; return@EditProfileForm }
+                                    coroutineScope.launch {
+                                        isSavingProfile = true
+                                        userRepository.updateCommentsEnabled(targetUid, commentsEnabled)
+                                        val uploadedUrl = if (selectedProfileImageUri != null) ImageRepository.uploadImage(context, selectedProfileImageUri!!, "pintxomatch/profiles") else user?.photoUrl?.toString()
+                                        val updates = userProfileChangeRequest { displayName = trimmedName; if (!uploadedUrl.isNullOrBlank()) photoUri = Uri.parse(uploadedUrl) }
+                                        user?.updateProfile(updates)?.addOnSuccessListener {
+                                            isSavingProfile = false; isEditing = false; selectedProfileImageUri = null; alertMessage = "Perfil actualizado"
+                                        }
+                                    }
+                                }
+                            )
+                        } else {
+                            // PREMIUM V2 DASHBOARD
+                            DashboardContent(
+                                totalPintxos = totalPintxos,
+                                level = level,
+                                progress = progressToNextLevel,
+                                isMyProfile = isMyProfile,
+                                isFriend = isFriend,
+                                loadingFriend = loadingFriendAction,
+                                onAction = {
+                                    if (isMyProfile) onNavigateToUserPintxos()
+                                    else if (currentUserId != null) {
                                         coroutineScope.launch {
-                                            isSavingProfile = true
-                                            userRepository.updateCommentsEnabled(targetUid, commentsEnabled)
-                                            val uploadedUrl = if (selectedProfileImageUri != null) ImageRepository.uploadImage(context, selectedProfileImageUri!!, "pintxomatch/profiles") else user?.photoUrl?.toString()
-                                            val updates = userProfileChangeRequest { displayName = trimmedName; if (!uploadedUrl.isNullOrBlank()) photoUri = Uri.parse(uploadedUrl) }
-                                            user?.updateProfile(updates)?.addOnSuccessListener {
-                                                isSavingProfile = false; isEditing = false; selectedProfileImageUri = null; alertMessage = "Perfil actualizado"
+                                            loadingFriendAction = true
+                                            if (isFriend) {
+                                                if (userRepository.removeFriend(currentUserId, targetUid)) isFriend = false
+                                            } else {
+                                                if (userRepository.addFriend(currentUserId, targetUid)) isFriend = true
                                             }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = colorPrimary, contentColor = MaterialTheme.colorScheme.onPrimary),
-                                    shape = RoundedCornerShape(12.dp),
-                                    enabled = !isSavingProfile
-                                ) {
-                                    if (isSavingProfile) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                                    else Text("GUARDAR CAMBIOS", fontWeight = FontWeight.Black, fontSize = 14.sp, letterSpacing = 1.sp)
-                                }
-                            }
-                        }
-                    } else {
-                        // PROGRESS BLOCK
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.StarOutline, contentDescription = null, tint = colorPrimary, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("EXPERIENCIA PINTXO", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = colorContainer),
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.1f))
-                        ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("Nivel $level", color = colorOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                    Text("${totalPintxos % 5} / 5 XP", color = colorOnSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
-                                LinearProgressIndicator(
-                                    progress = { progressToNextLevel },
-                                    modifier = Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(6.dp)),
-                                    color = colorPrimary,
-                                    trackColor = colorOnSurface.copy(alpha = 0.1f)
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text("Aporta más pintxos para subir de nivel y desbloquear insignias especiales.", color = colorOnSurfaceVariant, fontSize = 12.sp, lineHeight = 16.sp)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        // SHOWCASE SECTION
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = colorPrimary, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("VITRINA DE LOGROS", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            AchievementIcon(Icons.Default.Restaurant, "Crítico", totalPintxos >= 1)
-                            AchievementIcon(Icons.Default.Star, "Estrella", totalPintxos >= 5)
-                            AchievementIcon(Icons.Default.LocationOn, "Ruta", totalPintxos >= 10)
-                            AchievementIcon(Icons.Default.Badge, "Leyenda", totalPintxos >= 50)
-                        }
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        // SUMMARY
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Analytics, contentDescription = null, tint = colorPrimary, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("RESUMEN DE ACTIVIDAD", color = colorOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = colorContainer),
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.1f))
-                        ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("$totalPintxos", color = colorPrimary, fontSize = 32.sp, fontWeight = FontWeight.Black)
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                    Text("PINTXOS\nCOMPARTIDOS", color = colorOnSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp, lineHeight = 14.sp)
-                                }
-                                Spacer(modifier = Modifier.height(20.dp))
-                                if (isMyProfile) {
-                                    Button(
-                                        onClick = onNavigateToUserPintxos,
-                                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = colorPrimary.copy(alpha = 0.1f), contentColor = colorPrimary),
-                                        shape = RoundedCornerShape(12.dp),
-                                        border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.3f))
-                                    ) {
-                                        Text("GESTIONAR MIS APORTACIONES", fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
-                                    }
-                                } else if (currentUserId != null) {
-                                    Button(
-                                        onClick = {
-                                            coroutineScope.launch {
-                                                loadingFriendAction = true
-                                                if (isFriend) {
-                                                    val removed = userRepository.removeFriend(currentUserId, targetUid)
-                                                    if (removed) isFriend = false
-                                                } else {
-                                                    val added = userRepository.addFriend(currentUserId, targetUid)
-                                                    if (added) isFriend = true
-                                                }
-                                                loadingFriendAction = false
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (isFriend) colorContainer else colorPrimary,
-                                            contentColor = if (isFriend) colorPrimary else MaterialTheme.colorScheme.onPrimary
-                                        ),
-                                        shape = RoundedCornerShape(12.dp),
-                                        border = BorderStroke(1.dp, if (isFriend) colorPrimary else Color.Transparent),
-                                        enabled = !loadingFriendAction
-                                    ) {
-                                        if (loadingFriendAction) {
-                                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                                        } else {
-                                            Icon(
-                                                if (isFriend) Icons.Default.Check else Icons.Default.PersonAdd,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(if (isFriend) "Amigos" else "Añadir amigo", fontWeight = FontWeight.Black, fontSize = 13.sp)
+                                            loadingFriendAction = false
                                         }
                                     }
                                 }
-                            }
+                            )
+
+                            Spacer(modifier = Modifier.height(32.dp))
+
+                            // BENTO ACHIEVEMENT GRID
+                            Text(
+                                "VITRINA DE LOGROS",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colorPrimary,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.2.sp
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            AchievementBentoGrid(totalPintxos = totalPintxos)
+
+                            Spacer(modifier = Modifier.height(32.dp))
+
+                            // COMMENTS SECTION
+                            CommentsSection(targetUserId = targetUid, currentUserId = currentUserId, commentsEnabled = commentsEnabled)
                         }
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        // COMMENTS
-                        CommentsSection(targetUserId = targetUid, currentUserId = currentUserId, commentsEnabled = commentsEnabled) 
+                    }
+                    
+                    Spacer(modifier = Modifier.height(80.dp))
                 }
             }
-            Spacer(modifier = Modifier.height(50.dp))
         }
-    }
 
     AppSnackbarHost(
         hostState = snackbarHostState,
         modifier = Modifier.align(Alignment.TopCenter)
     )
-    } // closes content lambda of Scaffold
     } // closes Box
 } // closes UserProfileScreen
 
 @Composable
-private fun RowScope.AchievementIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, name: String, unlocked: Boolean) {
+private fun DashboardContent(
+    totalPintxos: Int,
+    level: Int,
+    progress: Float,
+    isMyProfile: Boolean,
+    isFriend: Boolean,
+    loadingFriend: Boolean,
+    onAction: () -> Unit
+) {
     val colorPrimary = MaterialTheme.colorScheme.primary
-    val colorBackground = MaterialTheme.colorScheme.surface
+    val colorSurface = MaterialTheme.colorScheme.surface
     val colorOnSurface = MaterialTheme.colorScheme.onSurface
-    val colorGray = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-    
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-        Box(
-            modifier = Modifier
-                .aspectRatio(1f)
-                .background(colorBackground, RoundedCornerShape(12.dp))
-                .border(
-                    BorderStroke(2.dp, if (unlocked) colorPrimary.copy(alpha = 0.5f) else colorGray.copy(alpha = 0.2f)),
-                    RoundedCornerShape(12.dp)
-                )
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                icon, 
-                contentDescription = null, 
-                tint = if (unlocked) colorPrimary else colorGray,
-                modifier = Modifier.fillMaxSize()
-            )
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val colorContainer = MaterialTheme.colorScheme.surfaceContainerHigh
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Stats Grid
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Main Stat Card
+            Card(
+                modifier = Modifier.weight(1.3f).height(160.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = colorPrimary),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(20.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Icon(Icons.Default.Analytics, null, tint = Color.White.copy(alpha = 0.7f))
+                    Column {
+                        Text("$totalPintxos", color = Color.White, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black)
+                        Text("PINTXOS COMPARTIDOS", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // XP Progress Card
+            Card(
+                modifier = Modifier.weight(1f).height(160.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = colorContainer)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.size(64.dp),
+                            color = colorPrimary,
+                            strokeWidth = 6.dp,
+                            trackColor = colorOnSurface.copy(alpha = 0.05f)
+                        )
+                        Text("${(progress * 100).toInt()}%", fontWeight = FontWeight.Black, fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("PRÓXIMO NIVEL", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = colorOnSurfaceVariant)
+                }
+            }
         }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = name, 
-            color = if (unlocked) colorOnSurface else colorGray, 
-            fontSize = 10.sp, 
-            fontWeight = FontWeight.Bold
-        )
+
+        // Action Button
+        Button(
+            onClick = onAction,
+            modifier = Modifier.fillMaxWidth().height(60.dp),
+            contentPadding = PaddingValues(0.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isMyProfile || !isFriend) colorPrimary else colorSurface,
+                contentColor = if (isMyProfile || !isFriend) Color.White else colorPrimary
+            ),
+            border = if (!isMyProfile && isFriend) BorderStroke(2.dp, colorPrimary) else null,
+            enabled = !loadingFriend
+        ) {
+            if (loadingFriend) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = colorPrimary, strokeWidth = 2.dp)
+            } else {
+                val icon = if (isMyProfile) Icons.Default.Restaurant else if (isFriend) Icons.Default.Check else Icons.Default.PersonAdd
+                val label = if (isMyProfile) "MIS APORTACIONES" else if (isFriend) "SOMOS AMIGOS" else "AÑADIR A AMIGOS"
+                
+                Icon(icon, null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(label, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AchievementBentoGrid(totalPintxos: Int) {
+    val achievements = listOf(
+        Triple(Icons.Default.Restaurant, "Crítico", totalPintxos >= 1),
+        Triple(Icons.Default.Star, "Estrella", totalPintxos >= 5),
+        Triple(Icons.Default.LocationOn, "Ruta", totalPintxos >= 10),
+        Triple(Icons.Default.Badge, "Leyenda", totalPintxos >= 50)
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AchievementTile(achievements[0], Modifier.weight(1f))
+            AchievementTile(achievements[1], Modifier.weight(1f))
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AchievementTile(achievements[2], Modifier.weight(1f))
+            AchievementTile(achievements[3], Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun AchievementTile(data: Triple<androidx.compose.ui.graphics.vector.ImageVector, String, Boolean>, modifier: Modifier) {
+    val (icon, name, unlocked) = data
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorContainer = MaterialTheme.colorScheme.surfaceContainerHigh
+    val colorOnSurface = MaterialTheme.colorScheme.onSurface
+    val colorGray = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+
+    Card(
+        modifier = modifier.height(90.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (unlocked) colorPrimary.copy(alpha = 0.08f) else colorContainer.copy(alpha = 0.5f)
+        ),
+        border = if (unlocked) BorderStroke(1.5.dp, colorPrimary.copy(alpha = 0.15f)) else null
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        if (unlocked) Brush.linearGradient(listOf(colorPrimary, colorPrimary.copy(alpha = 0.6f)))
+                        else Brush.linearGradient(listOf(colorGray, colorGray.copy(alpha = 0.5f))),
+                        RoundedCornerShape(14.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = Color.White, modifier = Modifier.size(24.dp))
+            }
+            Column(verticalArrangement = Arrangement.Center) {
+                Text(
+                    name.uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Black,
+                    color = if (unlocked) colorPrimary else colorOnSurface.copy(alpha = 0.4f),
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    if (unlocked) "Completado" else "Bloqueado",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 11.sp,
+                    color = colorOnSurface.copy(alpha = if (unlocked) 0.6f else 0.25f)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditProfileForm(
+    nuevoNombre: String,
+    onNombreChange: (String) -> Unit,
+    selectedUri: Uri?,
+    commentsEnabled: Boolean,
+    onCommentsToggle: (Boolean) -> Unit,
+    isSaving: Boolean,
+    onPickMedia: () -> Unit,
+    onLaunchCamera: () -> Unit,
+    onSave: () -> Unit
+) {
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorOnSurface = MaterialTheme.colorScheme.onSurface
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val colorContainer = MaterialTheme.colorScheme.surfaceContainerHigh
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(32.dp),
+        colors = CardDefaults.cardColors(containerColor = colorContainer)
+    ) {
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Text("DETALLES PÚBLICOS", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = colorPrimary)
+            
+            OutlinedTextField(
+                value = nuevoNombre,
+                onValueChange = onNombreChange,
+                label = { Text("Nombre de usuario") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colorPrimary,
+                    unfocusedBorderColor = colorOnSurfaceVariant.copy(alpha = 0.2f)
+                )
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    onClick = onPickMedia,
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = colorPrimary.copy(alpha = 0.1f),
+                    contentColor = colorPrimary
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Image, null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("GALERÍA", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+                Surface(
+                    onClick = onLaunchCamera,
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = colorPrimary.copy(alpha = 0.1f),
+                    contentColor = colorPrimary
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.PhotoCamera, null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("CÁMARA", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = colorOnSurface.copy(alpha = 0.05f))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Privacidad", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Permitir que otros comenten", style = MaterialTheme.typography.bodySmall, color = colorOnSurfaceVariant)
+                }
+                Switch(
+                    checked = commentsEnabled,
+                    onCheckedChange = onCommentsToggle,
+                    colors = SwitchDefaults.colors(checkedTrackColor = colorPrimary)
+                )
+            }
+
+            Button(
+                onClick = onSave,
+                modifier = Modifier.fillMaxWidth().height(60.dp),
+                shape = RoundedCornerShape(20.dp),
+                enabled = !isSaving
+            ) {
+                if (isSaving) CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                else Text("ACTUALIZAR PERFIL", fontWeight = FontWeight.Black)
+            }
+        }
     }
 }
 

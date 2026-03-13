@@ -1,5 +1,6 @@
 package com.example.pintxomatch.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -66,11 +67,30 @@ fun CommentsSection(targetUserId: String, currentUserId: String?, commentsEnable
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Forum, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            val title = if (currentUserId == targetUserId) "COMENTARIOS EN MI PERFIL" else "COMENTARIOS DE LA COMUNIDAD"
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp, color = MaterialTheme.colorScheme.onBackground)
+        // Modern Section Header
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Forum, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        val title = if (currentUserId == targetUserId) "MURO DE ACTIVIDAD" else "OPINIONES DEL CHEF"
+                        Text(title, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("${comments.size} Comentarios", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    }
+                }
+            }
         }
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -81,62 +101,72 @@ fun CommentsSection(targetUserId: String, currentUserId: String?, commentsEnable
             Text("El usuario ha desactivado los comentarios.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
         } else {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = newCommentText,
-                    onValueChange = { newCommentText = it },
-                    placeholder = { Text("Escribe un comentario...", fontSize = 14.sp) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    maxLines = 3,
-                    trailingIcon = {
-                        IconButton(
-                            onClick = {
-                                if (newCommentText.isNotBlank() && !isPosting) {
-                                    coroutineScope.launch {
-                                        isPosting = true
-                                        val me = AuthRepository.currentUser
-                                        val comment = ProfileComment(
-                                            senderId = currentUserId,
-                                            senderName = me?.displayName ?: "Usuario",
-                                            senderPhotoUrl = me?.photoUrl?.toString() ?: "",
-                                            receiverId = targetUserId,
-                                            text = newCommentText.trim()
-                                        )
-                                        val success = userRepository.leaveComment(comment)
-                                        if (success) {
-                                            newCommentText = ""
-                                            loadComments()
-                                        }
-                                        isPosting = false
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.05f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = newCommentText,
+                        onValueChange = { newCommentText = it },
+                        placeholder = { Text("Comparte algo con el mundo...", fontSize = 14.sp) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        maxLines = 3
+                    )
+                    
+                    Surface(
+                        onClick = {
+                            if (newCommentText.isNotBlank() && !isPosting) {
+                                coroutineScope.launch {
+                                    isPosting = true
+                                    val me = AuthRepository.currentUser
+                                    val comment = ProfileComment(
+                                        senderId = currentUserId,
+                                        senderName = me?.displayName ?: "Usuario",
+                                        senderPhotoUrl = me?.photoUrl?.toString() ?: "",
+                                        receiverId = targetUserId,
+                                        text = newCommentText.trim()
+                                    )
+                                    val success = userRepository.leaveComment(comment)
+                                    if (success) {
+                                        newCommentText = ""
+                                        loadComments()
                                     }
+                                    isPosting = false
                                 }
-                            },
-                            enabled = newCommentText.isNotBlank() && !isPosting,
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .size(36.dp)
-                                .background(if (newCommentText.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape)
-                        ) {
+                            }
+                        },
+                        enabled = newCommentText.isNotBlank() && !isPosting,
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (newCommentText.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
                             if (isPosting) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
                             } else {
                                 Icon(
                                     Icons.Default.Send,
                                     contentDescription = "Enviar",
-                                    tint = if (newCommentText.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(16.dp)
+                                    tint = if (newCommentText.isNotBlank()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
                     }
-                )
+                }
             }
             Spacer(modifier = Modifier.height(24.dp))
         }
@@ -221,13 +251,17 @@ fun CommentItem(
     canDelete: Boolean = false,
     onDelete: () -> Unit = {}
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
-            .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
-            .padding(16.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f))
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
         AsyncImage(
             model = comment.senderPhotoUrl.takeIf { it.isNotBlank() } ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
             contentDescription = "Avatar de ${comment.senderName}",
@@ -276,5 +310,6 @@ fun CommentItem(
                 }
             }
         }
+    }
     }
 }
