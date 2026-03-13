@@ -443,7 +443,7 @@ fun UserProfileScreen(
 
                             Spacer(modifier = Modifier.height(32.dp))
 
-                            // COMMENTS SECTION
+                            // COMMENTS SECTION (Full dashboard width)
                             CommentsSection(targetUserId = targetUid, currentUserId = currentUserId, commentsEnabled = commentsEnabled)
                         }
                     }
