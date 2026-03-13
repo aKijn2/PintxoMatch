@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +34,20 @@ import com.example.pintxomatch.data.repository.ImageRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import java.io.File
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Euro
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Store
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,179 +118,345 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Subir un Pintxo") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "Volver")
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-            // 1. VISTA PREVIA DE LA IMAGEN (Si el link es válido, se verá aquí)
-            Card(
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorSurface = MaterialTheme.colorScheme.surface
+    val colorBackground = MaterialTheme.colorScheme.background
+    val colorOnSurface = MaterialTheme.colorScheme.onSurface
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val colorContainer = MaterialTheme.colorScheme.surfaceContainerHigh
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(colorBackground)) {
+        val maxWidth = maxWidth
+        val isTablet = maxWidth > 600.dp
+        
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // IMMERSIVE HEADER (Adaptive)
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                when {
-                    pickedImageUri != null -> {
-                        AsyncImage(
-                            model = pickedImageUri,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                    .height(if (isTablet) 320.dp else 260.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(colorPrimary.copy(alpha = 0.8f), colorBackground)
                         )
-                    }
-                    else -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Search, null, modifier = Modifier.size(48.dp))
-                            Text("Haz foto o elige de galería")
+                    )
+            ) {
+                // Top Navigation
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 24.dp, start = 16.dp, end = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        onClick = onNavigateBack,
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.05f),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.ArrowBack, "Volver", tint = colorOnSurface, modifier = Modifier.size(20.dp))
                         }
                     }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        "SUBIR EXPERIENCIA",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 1.2.sp,
+                        color = colorOnSurface
+                    )
                 }
-                }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        pickMediaLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    },
-                    modifier = Modifier.weight(1f)
+                // HERO IMAGE PREVIEW (Adaptive Width)
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 24.dp)
+                        .offset(y = 40.dp)
+                        .widthIn(max = 500.dp)
+                        .fillMaxWidth()
+                        .height(220.dp),
+                    shape = RoundedCornerShape(32.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
                 ) {
-                    Text("Galería")
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        val hasCameraPermission = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.CAMERA
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        if (hasCameraPermission) {
-                            launchCameraCapture()
+                    Box(modifier = Modifier.fillMaxSize().background(colorContainer)) {
+                        if (pickedImageUri != null) {
+                            AsyncImage(
+                                model = pickedImageUri,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
                         } else {
-                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Sacar foto")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(value = nombrePintxo, onValueChange = { nombrePintxo = it }, label = { Text("Nombre del Pintxo") }, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(value = nombreBar, onValueChange = { nombreBar = it }, label = { Text("Bar") }, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(value = ubicacion, onValueChange = { ubicacion = it }, label = { Text("Ubicación") }, modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = precio,
-                onValueChange = { precio = it },
-                label = { Text("Precio €") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // 3. BOTÓN DE PUBLICAR (Directo a Firestore, Gratis)
-            Button(
-                onClick = {
-                    if (nombrePintxo.isBlank()) {
-                        alertMessage = "Faltan datos clave"
-                        return@Button
-                    }
-
-                    coroutineScope.launch {
-                        isUploading = true
-
-                        val finalImageUrl = when {
-                            pickedImageUri != null -> {
-                                ImageRepository.uploadImage(
-                                    context = context,
-                                    uri = pickedImageUri!!
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = colorPrimary.copy(alpha = 0.1f),
+                                    modifier = Modifier.size(64.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.PhotoCamera, 
+                                            null, 
+                                            modifier = Modifier.size(32.dp), 
+                                            tint = colorPrimary
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "CAPTURA EL MOMENTO",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.sp,
+                                    color = colorOnSurfaceVariant
                                 )
                             }
-                            else -> null
                         }
-
-                        if (finalImageUrl.isNullOrBlank()) {
-                            isUploading = false
-                            alertMessage = "Selecciona una foto de cámara o galería"
-                            return@launch
-                        }
-
-                        val db = FirebaseFirestore.getInstance()
-                        val currentUser = AuthRepository.currentUser
-                        val pintxo = hashMapOf(
-                            "nombre" to nombrePintxo,
-                            "bar" to nombreBar,
-                            "ubicacion" to ubicacion,
-                            "precio" to (precio.toDoubleOrNull() ?: 0.0),
-                            "imageUrl" to finalImageUrl,
-                            "uploaderUid" to (currentUser?.uid ?: ""),
-                            "uploaderEmail" to (currentUser?.email ?: ""),
-                            "uploaderDisplayName" to (currentUser?.displayName ?: currentUser?.email?.substringBefore("@") ?: ""),
-                            "uploaderPhotoUrl" to (currentUser?.photoUrl?.toString() ?: ""),
-                            "timestamp" to System.currentTimeMillis()
-                        )
-
-                        db.collection("Pintxos")
-                            .add(pintxo)
-                            .addOnSuccessListener {
-                                isUploading = false
-                                alertMessage = "Pintxo publicado"
-                                onNavigateBack()
-                            }
-                            .addOnFailureListener {
-                                isUploading = false
-                                alertMessage = "Error al subir"
-                            }
                     }
-                },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                enabled = !isUploading
+                }
+            }
+
+            Spacer(modifier = Modifier.height(64.dp))
+
+            // CONTENT WRAPPER (Max Width for Tablets)
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 600.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
             ) {
-                if (isUploading) CircularProgressIndicator(modifier = Modifier.size(24.dp)) else Text("¡Publicar!")
+                // SELECTION ACTIONS
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ActionCard(
+                        title = "CÁMARA",
+                        icon = Icons.Default.PhotoCamera,
+                        color = colorPrimary,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            val hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                            if (hasCameraPermission) launchCameraCapture() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    )
+                    ActionCard(
+                        title = "GALERÍA",
+                        icon = Icons.Default.Image,
+                        color = colorPrimary,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // THE EXPERIENCE CARD (Grouped form)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(32.dp),
+                    color = colorSurface,
+                    border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.05f)),
+                    shadowElevation = 2.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        Text(
+                            "DETALLES DEL PINTXO",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.5.sp,
+                            color = colorPrimary.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        PremiumInput(
+                            value = nombrePintxo,
+                            onValueChange = { nombrePintxo = it },
+                            label = "Nombre del Pintxo",
+                            icon = Icons.Default.Restaurant
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        PremiumInput(
+                            value = nombreBar,
+                            onValueChange = { nombreBar = it },
+                            label = "Nombre del Bar",
+                            icon = Icons.Default.Store
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        PremiumInput(
+                            value = ubicacion,
+                            onValueChange = { ubicacion = it },
+                            label = "Ubicación",
+                            icon = Icons.Default.LocationOn
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        PremiumInput(
+                            value = precio,
+                            onValueChange = { precio = it },
+                            label = "Precio (€)",
+                            icon = Icons.Default.Euro,
+                            keyboardType = KeyboardType.Decimal
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(40.dp))
+
+                // PUBLISH ACTION
+                Button(
+                    onClick = {
+                        if (nombrePintxo.isBlank()) {
+                            alertMessage = "Faltan datos clave"
+                            return@Button
+                        }
+
+                        coroutineScope.launch {
+                            isUploading = true
+                            val finalImageUrl = when {
+                                pickedImageUri != null -> ImageRepository.uploadImage(context, pickedImageUri!!)
+                                else -> null
+                            }
+
+                            if (finalImageUrl.isNullOrBlank()) {
+                                isUploading = false
+                                alertMessage = "Selecciona una foto"
+                                return@launch
+                            }
+
+                            val db = FirebaseFirestore.getInstance()
+                            val currentUser = AuthRepository.currentUser
+                            val pintxo = hashMapOf(
+                                "nombre" to nombrePintxo,
+                                "bar" to nombreBar,
+                                "ubicacion" to ubicacion,
+                                "precio" to (precio.toDoubleOrNull() ?: 0.0),
+                                "imageUrl" to finalImageUrl,
+                                "uploaderUid" to (currentUser?.uid ?: ""),
+                                "uploaderEmail" to (currentUser?.email ?: ""),
+                                "uploaderDisplayName" to (currentUser?.displayName ?: currentUser?.email?.substringBefore("@") ?: ""),
+                                "uploaderPhotoUrl" to (currentUser?.photoUrl?.toString() ?: ""),
+                                "timestamp" to System.currentTimeMillis()
+                            )
+
+                            db.collection("Pintxos").add(pintxo)
+                                .addOnSuccessListener {
+                                    isUploading = false
+                                    alertMessage = "Pintxo publicado con éxito"
+                                    onNavigateBack()
+                                }
+                                .addOnFailureListener {
+                                    isUploading = false
+                                    alertMessage = "Error al subir"
+                                }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(68.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = colorPrimary),
+                    enabled = !isUploading,
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+                ) {
+                    if (isUploading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                    } else {
+                        Text(
+                            "PUBLICAR EXPERIENCIA", 
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.2.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
         
+        AppSnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+    } // end BoxWithConstraints
+}
+
+@Composable
+private fun ActionCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .height(100.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = color.copy(alpha = 0.08f)
+        ),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.1f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                title, 
+                style = MaterialTheme.typography.labelSmall, 
+                fontWeight = FontWeight.Black,
+                color = color
+            )
         }
     }
-    AppSnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier.align(Alignment.TopCenter)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PremiumInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorContainer = MaterialTheme.colorScheme.surfaceContainerHigh
+    
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        label = { Text(label) },
+        leadingIcon = { Icon(icon, null, modifier = Modifier.size(20.dp), tint = colorPrimary.copy(alpha = 0.6f)) },
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = colorPrimary,
+            unfocusedBorderColor = Color.Transparent,
+            focusedContainerColor = colorContainer.copy(alpha = 0.5f),
+            unfocusedContainerColor = colorContainer.copy(alpha = 0.5f)
+        )
     )
-    } // end outer Box
 }
 
 private fun createTempImageUri(context: Context): Uri? {
