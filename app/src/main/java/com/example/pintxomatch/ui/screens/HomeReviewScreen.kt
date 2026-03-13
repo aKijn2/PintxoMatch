@@ -202,7 +202,8 @@ fun HomeReviewScreen(
             .orderBy(FieldPath.documentId())
             .get()
             .addOnSuccessListener { result ->
-                pintxos = result.map { doc -> mapDocumentToPintxo(doc, currentUid) }
+                // RANDOMIZE the feed order for discovery
+                pintxos = result.map { doc -> mapDocumentToPintxo(doc, currentUid) }.shuffled()
                 isLoading = false
             }
             .addOnFailureListener {
