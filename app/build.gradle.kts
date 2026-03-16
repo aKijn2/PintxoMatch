@@ -18,6 +18,12 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        // Image storage backend selector: "cloudinary" or "local".
+        buildConfigField("String", "IMAGE_PROVIDER", "\"local\"")
+        // adb reverse tcp:8080 tcp:8080 tunnels emulator localhost:8080 → host:8080.
+        buildConfigField("String", "LOCAL_IMAGE_BASE_URL", "\"http://localhost:8080\"")
+        buildConfigField("String", "LOCAL_IMAGE_API_KEY", "\"pintxomatch-local-dev-key\"")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -39,6 +45,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

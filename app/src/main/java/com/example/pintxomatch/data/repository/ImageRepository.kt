@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import com.example.pintxomatch.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -14,6 +15,7 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
@@ -26,6 +28,7 @@ object ImageRepository {
     private const val INITIAL_JPEG_QUALITY = 82
     private const val MIN_JPEG_QUALITY = 55
     private const val DELETE_TOKEN_WINDOW_MINUTES = 10L
+    private const val PROVIDER_LOCAL = "local"
 
     data class ImageUploadResult(
         val secureUrl: String,
@@ -59,6 +62,10 @@ object ImageRepository {
         val payload = withContext(Dispatchers.IO) {
             optimizeImageForUpload(context, uri)
         } ?: return ImageUploadAttempt(result = null, errorMessage = "No se pudo leer la imagen seleccionada")
+
+        if (isUsingLocalProvider()) {
+            return withContext(Dispatchers.IO) { uploadToLocalServer(payload) }
+        }
 
         return uploadBytes(
             payload = payload,
@@ -201,7 +208,11 @@ object ImageRepository {
         return try {
             val uploadMarker = "/image/upload/"
             val markerIndex = imageUrl.indexOf(uploadMarker)
-            if (markerIndex == -1) return null
+            if (markerIndex == -1) {
+                val lastSegment = imageUrl.substringAfterLast('/').substringBefore('?')
+                if (lastSegment.isBlank()) return null
+                return lastSegment.substringBeforeLast('.', lastSegment).takeIf { it.isNotBlank() }
+            }
 
             val pathAfterUpload = imageUrl.substring(markerIndex + uploadMarker.length)
             val segments = pathAfterUpload.split('/').filter { it.isNotBlank() }
@@ -231,6 +242,10 @@ object ImageRepository {
     suspend fun deleteImageByToken(deleteToken: String): Boolean = withContext(Dispatchers.IO) {
         if (deleteToken.isBlank()) return@withContext false
 
+        if (isUsingLocalProvider()) {
+            return@withContext deleteLocalImageById(deleteToken)
+        }
+
         try {
             val connection = (URL("https://api.cloudinary.com/v1_1/$CLOUD_NAME/delete_by_token").openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -245,6 +260,100 @@ object ImageRepository {
 
             val responseCode = connection.responseCode
             responseCode in 200..299
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun isUsingLocalProvider(): Boolean {
+        return BuildConfig.IMAGE_PROVIDER.equals(PROVIDER_LOCAL, ignoreCase = true)
+    }
+
+    private fun uploadToLocalServer(payload: UploadPayload): ImageUploadAttempt {
+        return try {
+            val boundary = "Boundary-${UUID.randomUUID()}"
+            val baseUrl = BuildConfig.LOCAL_IMAGE_BASE_URL.trimEnd('/')
+            val endpoint = URL("$baseUrl/api/images")
+            val connection = (endpoint.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                if (BuildConfig.LOCAL_IMAGE_API_KEY.isNotBlank()) {
+                    setRequestProperty("x-api-key", BuildConfig.LOCAL_IMAGE_API_KEY)
+                }
+            }
+
+            val fileName = "gallery_${System.currentTimeMillis()}.${payload.fileExtension}"
+            DataOutputStream(connection.outputStream).use { out ->
+                out.writeBytes("--$boundary\r\n")
+                out.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"$fileName\"\r\n")
+                out.writeBytes("Content-Type: ${payload.contentType}\r\n\r\n")
+                out.write(payload.bytes)
+                out.writeBytes("\r\n")
+                out.writeBytes("--$boundary--\r\n")
+                out.flush()
+            }
+
+            val responseCode = connection.responseCode
+            val response = if (responseCode in 200..299) {
+                connection.inputStream.bufferedReader().use { it.readText() }
+            } else {
+                connection.errorStream?.bufferedReader()?.use { it.readText() }
+            }
+
+            if (responseCode !in 200..299 || response.isNullOrBlank()) {
+                ImageUploadAttempt(result = null, errorMessage = buildLocalUploadErrorMessage(responseCode, response))
+            } else {
+                val json = JSONObject(response)
+                val imageUrl = json.optString("url")
+                val imageId = json.optString("imageId").ifBlank { extractPublicIdFromUrl(imageUrl) }
+
+                if (imageUrl.isBlank()) {
+                    ImageUploadAttempt(result = null, errorMessage = "Servidor local no devolvió URL")
+                } else {
+                    ImageUploadAttempt(
+                        result = ImageUploadResult(
+                            secureUrl = imageUrl,
+                            publicId = imageId,
+                            deleteToken = imageId,
+                            uploadedAtMillis = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            ImageUploadAttempt(result = null, errorMessage = e.localizedMessage ?: "Error subiendo al servidor local")
+        }
+    }
+
+    private fun buildLocalUploadErrorMessage(responseCode: Int, response: String?): String {
+        if (!response.isNullOrBlank()) {
+            try {
+                val json = JSONObject(response)
+                val message = json.optString("error")
+                if (message.isNotBlank()) {
+                    return "Servidor local: $message"
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return "Servidor local: error subiendo imagen (HTTP $responseCode)"
+    }
+
+    private fun deleteLocalImageById(imageId: String): Boolean {
+        return try {
+            val baseUrl = BuildConfig.LOCAL_IMAGE_BASE_URL.trimEnd('/')
+            val encodedId = URLEncoder.encode(imageId, Charsets.UTF_8.name())
+            val endpoint = URL("$baseUrl/api/images/$encodedId")
+            val connection = (endpoint.openConnection() as HttpURLConnection).apply {
+                requestMethod = "DELETE"
+                if (BuildConfig.LOCAL_IMAGE_API_KEY.isNotBlank()) {
+                    setRequestProperty("x-api-key", BuildConfig.LOCAL_IMAGE_API_KEY)
+                }
+            }
+
+            val responseCode = connection.responseCode
+            responseCode in 200..299 || responseCode == 404
         } catch (_: Exception) {
             false
         }

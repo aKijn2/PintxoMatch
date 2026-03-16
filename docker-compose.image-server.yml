@@ -1,0 +1,16 @@
+services:
+  image-server:
+    build:
+      context: ./docker/image-server
+      dockerfile: Dockerfile
+    container_name: pintxomatch-image-server
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      STORAGE_ROOT: /data
+      PUBLIC_BASE_URL: http://localhost:8080
+      IMAGE_SERVER_API_KEY: pintxomatch-local-dev-key
+    volumes:
+      - ./docker/image-server/data:/data
+    ports:
+      - "8080:8080"

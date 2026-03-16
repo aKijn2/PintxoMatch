@@ -33,3 +33,6 @@ google-services.json
 # --- OS files ---
 .DS_Store
 Thumbs.db
+
+# --- Local Docker image server uploads (dev only, not for version control) ---
+docker/image-server/data/

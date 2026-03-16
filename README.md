@@ -39,7 +39,7 @@ Integrated map experience powered by **OSM** and **Google Maps Routing**.
 | :--- | :--- |
 | **Android UI** | Jetpack Compose, Material 3, Navigation Compose |
 | **Backend** | Firebase Auth, Cloud Firestore, Realtime Database |
-| **Media & Images** | Cloudinary (Hosting), Coil (Loading) |
+| **Media & Images** | Local Docker server (dev) / Cloudinary (prod), Coil (loading) |
 | **Navigation & Maps** | osmdroid (OpenStreetMap), Google Maps Intent Routing |
 | **Architectures** | MVVM, Coroutines, Flow |
 
@@ -59,8 +59,8 @@ Integrated map experience powered by **OSM** and **Google Maps Routing**.
 
 ### Prerequisites
 - **Android Studio** (Hedgehog or newer recommended)
-- **Firebase Project:** You'll need to set up a project at [Firebase Console](https://console.firebase.google.com/).
-- **Cloudinary Account:** For image hosting.
+- **Firebase Project:** Set up at [Firebase Console](https://console.firebase.google.com/).
+- **Docker Desktop:** Required for the local image server (development mode).
 
 ### Quick Start
 1. **Clone & Open:**
@@ -70,10 +70,41 @@ Integrated map experience powered by **OSM** and **Google Maps Routing**.
 2. **Firebase Setup:**
    - Download `google-services.json` from your Firebase project.
    - Place it in the `app/` directory.
-3. **Cloudinary Configuration:**
-   - Update `CloudinarySetup` with your `cloudName` and `uploadPreset` (currently using `dm99kc8ky`).
-4. **Permissions:**
+3. **Permissions:**
    - Ensure Location and Camera permissions are granted on your device/emulator.
+
+### Image Storage: Local Docker Server (Development)
+
+The app currently uses a local Docker container for image hosting during development.
+
+**Every dev session, run these two commands:**
+
+```bash
+# 1. Start the image server
+docker compose -f docker-compose.image-server.yml up -d
+
+# 2. Tunnel the emulator to your host (run while emulator is open)
+adb reverse tcp:8080 tcp:8080
+```
+
+Verify the server is up:
+```bash
+# PowerShell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/health"
+```
+
+`app/build.gradle.kts` is already configured with `IMAGE_PROVIDER = "local"`. Just rebuild and run.
+
+Uploaded files are persisted in `docker/image-server/data/uploads/`.
+
+> See [docs/CHANGES.md](docs/CHANGES.md) for a full explanation of the image system architecture and all code changes.
+
+### Switching to Cloudinary (Production)
+
+In `app/build.gradle.kts`, change:
+```kotlin
+buildConfigField("String", "IMAGE_PROVIDER", "\"cloudinary\"")
+```
 
 ---
 
@@ -87,7 +118,10 @@ Integrated map experience powered by **OSM** and **Google Maps Routing**.
   "precio": 3.50,
   "averageRating": 4.8,
   "uploaderUid": "user_123",
-  "imageUrl": "cloudinary_url_here"
+  "imageUrl": "http://localhost:8080/uploads/img_xxx.jpg",
+  "imagePublicId": "img_xxx",
+  "imageDeleteToken": "img_xxx",
+  "imageDeleteTokenCreatedAt": 1710000000000
 }
 ```
 
