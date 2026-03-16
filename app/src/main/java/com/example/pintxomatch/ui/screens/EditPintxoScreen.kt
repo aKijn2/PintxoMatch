@@ -30,7 +30,7 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.data.repository.AuthRepository
-import com.example.pintxomatch.data.repository.ImageRepository
+import com.example.pintxomatch.data.repository.PintxoRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import java.io.File
@@ -43,6 +43,7 @@ fun EditPintxoScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val pintxoRepository = remember { PintxoRepository() }
 
     val firestore = FirebaseFirestore.getInstance()
     val currentUser = AuthRepository.currentUser
@@ -259,42 +260,30 @@ fun EditPintxoScreen(
                                 }
 
                                 coroutineScope.launch {
-                                    isUploading = true
-
-                                    val finalImageUrl = when {
-                                        pickedImageUri != null -> {
-                                            ImageRepository.uploadImage(
-                                                context = context,
-                                                uri = pickedImageUri!!
-                                            )
-                                        }
-                                        else -> originalImageUrl
-                                    }
-
-                                    if (pickedImageUri != null && finalImageUrl.isNullOrBlank()) {
-                                        isUploading = false
-                                        alertMessage = "Error al subir la nueva imagen"
+                                    val userUid = currentUser?.uid
+                                    if (userUid.isNullOrBlank()) {
+                                        alertMessage = "No estás logueado"
                                         return@launch
                                     }
 
-                                    dbUpdates(
+                                    isUploading = true
+
+                                    val result = pintxoRepository.updateUserPintxo(
+                                        context = context,
                                         pintxoId = pintxoId,
+                                        userUid = userUid,
                                         nombrePintxo = nombrePintxo,
                                         nombreBar = nombreBar,
                                         ubicacion = ubicacion,
                                         precio = precio,
-                                        finalImageUrl = finalImageUrl,
-                                        firestore = firestore,
-                                        onSuccess = {
-                                            isUploading = false
-                                            alertMessage = "Pintxo actualizado"
-                                            onNavigateBack()
-                                        },
-                                        onFailure = {
-                                            isUploading = false
-                                            alertMessage = "Error al actualizar"
-                                        }
+                                        newImageUri = pickedImageUri
                                     )
+
+                                    isUploading = false
+                                    alertMessage = result.userMessage
+                                    if (result.isSuccess) {
+                                        onNavigateBack()
+                                    }
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -320,17 +309,19 @@ fun EditPintxoScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        isDeleting = true
                         showDeleteDialog = false
-                        firestore.collection("Pintxos").document(pintxoId).delete()
-                            .addOnSuccessListener {
-                                isDeleting = false
+                        coroutineScope.launch {
+                            isDeleting = true
+                            val result = pintxoRepository.deleteUserPintxo(
+                                pintxoId = pintxoId,
+                                userUid = currentUser?.uid.orEmpty()
+                            )
+                            isDeleting = false
+                            alertMessage = result.userMessage
+                            if (result.isSuccess) {
                                 onNavigateBack()
                             }
-                            .addOnFailureListener {
-                                isDeleting = false
-                                alertMessage = "Error al borrar"
-                            }
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
@@ -344,32 +335,6 @@ fun EditPintxoScreen(
             }
         )
     }
-}
-
-private fun dbUpdates(
-    pintxoId: String,
-    nombrePintxo: String,
-    nombreBar: String,
-    ubicacion: String,
-    precio: String,
-    finalImageUrl: String?,
-    firestore: FirebaseFirestore,
-    onSuccess: () -> Unit,
-    onFailure: () -> Unit
-) {
-    val updates = mutableMapOf<String, Any>(
-        "nombre" to nombrePintxo,
-        "bar" to nombreBar,
-        "ubicacion" to ubicacion,
-        "precio" to (precio.toDoubleOrNull() ?: 0.0)
-    )
-    if (finalImageUrl != null) {
-        updates["imageUrl"] = finalImageUrl
-    }
-    
-    firestore.collection("Pintxos").document(pintxoId).update(updates)
-        .addOnSuccessListener { onSuccess() }
-        .addOnFailureListener { onFailure() }
 }
 
 private fun createTempImageUriEdit(context: Context): Uri? {

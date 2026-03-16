@@ -329,14 +329,20 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
 
                         coroutineScope.launch {
                             isUploading = true
-                            val finalImageUrl = when {
-                                pickedImageUri != null -> ImageRepository.uploadImage(context, pickedImageUri!!)
+                            val uploadAttempt = when {
+                                pickedImageUri != null -> ImageRepository.uploadImageAttempt(context, pickedImageUri!!)
                                 else -> null
                             }
+                            val uploadResult = uploadAttempt?.result
+                            val finalImageUrl = uploadResult?.secureUrl
 
                             if (finalImageUrl.isNullOrBlank()) {
                                 isUploading = false
-                                alertMessage = "Selecciona una foto"
+                                alertMessage = if (pickedImageUri == null) {
+                                    "Selecciona una foto"
+                                } else {
+                                    uploadAttempt?.errorMessage ?: "Error al subir la imagen"
+                                }
                                 return@launch
                             }
 
@@ -348,6 +354,9 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
                                 "ubicacion" to ubicacion,
                                 "precio" to (precio.toDoubleOrNull() ?: 0.0),
                                 "imageUrl" to finalImageUrl,
+                                "imagePublicId" to (uploadResult?.publicId ?: ""),
+                                "imageDeleteToken" to (uploadResult?.deleteToken ?: ""),
+                                "imageDeleteTokenCreatedAt" to (uploadResult?.uploadedAtMillis ?: 0L),
                                 "uploaderUid" to (currentUser?.uid ?: ""),
                                 "uploaderEmail" to (currentUser?.email ?: ""),
                                 "uploaderDisplayName" to (currentUser?.displayName ?: currentUser?.email?.substringBefore("@") ?: ""),
