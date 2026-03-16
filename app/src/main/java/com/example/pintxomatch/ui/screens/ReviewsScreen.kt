@@ -1,10 +1,13 @@
 package com.example.pintxomatch.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,32 +17,36 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import coil.compose.SubcomposeAsyncImage
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,8 +57,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -241,91 +248,77 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            topBar = {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding(),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 2.dp
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(
-                                Icons.Default.ArrowBack,
-                                contentDescription = "Volver",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Column {
-                            Text(
-                                text = "Reseñas",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "de la comunidad",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+    val colorBackground = MaterialTheme.colorScheme.background
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Scaffold(
+        containerColor = colorBackground,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("Reseñas", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
-                }
-            }
-        ) { paddingValues ->
-            if (isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else {
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = colorBackground
+                )
+            )
+        },
+        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) }
+    ) { paddingValues ->
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
+        } else {
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxSize().padding(paddingValues)
+            ) {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.fillMaxSize().align(Alignment.TopCenter),
+                    contentPadding = PaddingValues(
+                        start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // ── Write review card ──────────────────────────────────
                     item {
                         Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .shadow(4.dp, RoundedCornerShape(20.dp)),
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f)),
+                            shadowElevation = 1.dp
                         ) {
                             Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(20.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 Text(
                                     text = "Escribe tu reseña",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
 
                                 if (ratedPintxos.isEmpty()) {
-                                    Text(
-                                        text = "Valora un pintxo primero para poder escribir una reseña.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = colorOnSurfaceVariant.copy(alpha = 0.07f)
+                                    ) {
+                                        Text(
+                                            text = "Valora un pintxo primero para poder escribir una reseña.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = colorOnSurfaceVariant,
+                                            modifier = Modifier.padding(14.dp)
+                                        )
+                                    }
                                 } else {
                                     val filteredOptions = ratedPintxos.filter {
                                         selectionSearch.isBlank() ||
@@ -333,6 +326,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                             it.barName.contains(selectionSearch, ignoreCase = true)
                                     }
 
+                                    // Pintxo picker
                                     ExposedDropdownMenuBox(
                                         expanded = showPintxoDropdown,
                                         onExpandedChange = { showPintxoDropdown = it }
@@ -343,18 +337,21 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                                 selectionSearch = it
                                                 showPintxoDropdown = true
                                             },
-                                            modifier = Modifier
-                                                .menuAnchor()
-                                                .fillMaxWidth(),
+                                            modifier = Modifier.menuAnchor().fillMaxWidth(),
                                             label = { Text("Pintxo") },
                                             placeholder = { Text("Elige el pintxo a reseñar") },
                                             trailingIcon = {
                                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = showPintxoDropdown)
                                             },
-                                            shape = RoundedCornerShape(12.dp),
-                                            singleLine = true
+                                            shape = RoundedCornerShape(20.dp),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = colorPrimary,
+                                                unfocusedBorderColor = Color.Transparent,
+                                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+                                            )
                                         )
-
                                         ExposedDropdownMenu(
                                             expanded = showPintxoDropdown,
                                             onDismissRequest = {
@@ -364,7 +361,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                         ) {
                                             if (filteredOptions.isEmpty()) {
                                                 DropdownMenuItem(
-                                                    text = { Text("Sin resultados") },
+                                                    text = { Text("Sin resultados", color = colorOnSurfaceVariant) },
                                                     onClick = {}
                                                 )
                                             } else {
@@ -372,11 +369,11 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                                     DropdownMenuItem(
                                                         text = {
                                                             Column {
-                                                                Text(option.name, fontWeight = FontWeight.Medium)
+                                                                Text(option.name, fontWeight = FontWeight.SemiBold)
                                                                 Text(
                                                                     "${option.barName} · ${option.myStars}★",
                                                                     style = MaterialTheme.typography.bodySmall,
-                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                    color = colorOnSurfaceVariant
                                                                 )
                                                             }
                                                         },
@@ -404,21 +401,22 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                         }
                                     }
 
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    // Star picker
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(
-                                            text = "Valoración",
+                                            text = "Tu valoración",
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = colorOnSurfaceVariant
                                         )
-                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             (1..5).forEach { star ->
                                                 Icon(
                                                     imageVector = if (star <= selectedStars) Icons.Filled.Star else Icons.Outlined.StarOutline,
                                                     contentDescription = "$star estrellas",
                                                     tint = if (star <= selectedStars) Color(0xFFFFC107)
-                                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                                    else colorOnSurfaceVariant.copy(alpha = 0.35f),
                                                     modifier = Modifier
-                                                        .size(28.dp)
+                                                        .size(32.dp)
                                                         .clickable(
                                                             interactionSource = remember { MutableInteractionSource() },
                                                             indication = null
@@ -428,63 +426,81 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                         }
                                     }
 
+                                    // Review text
                                     OutlinedTextField(
                                         value = reviewText,
                                         onValueChange = { reviewText = it },
                                         modifier = Modifier.fillMaxWidth(),
                                         minLines = 3,
-                                        maxLines = 5,
+                                        maxLines = 6,
                                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                                         label = { Text("Tu reseña") },
-                                        placeholder = { Text("Comparte tu experiencia con este pintxo...") },
-                                        shape = RoundedCornerShape(12.dp)
+                                        placeholder = { Text("Comparte tu experiencia con este pintxo…") },
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = colorPrimary,
+                                            unfocusedBorderColor = Color.Transparent,
+                                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+                                        )
                                     )
 
-                                    Button(
+                                    // Submit button
+                                    FilledTonalButton(
                                         onClick = { submitReview() },
                                         enabled = !isSaving,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Text(
-                                            text = when {
-                                                isSaving -> "Guardando..."
-                                                editingReviewId != null -> "Actualizar reseña"
-                                                else -> "Publicar reseña"
-                                            },
-                                            modifier = Modifier.padding(vertical = 4.dp),
-                                            fontWeight = FontWeight.SemiBold
+                                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = colorPrimary.copy(alpha = 0.14f),
+                                            contentColor = colorPrimary
                                         )
+                                    ) {
+                                        if (isSaving) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                strokeWidth = 2.dp,
+                                                color = colorPrimary
+                                            )
+                                        } else {
+                                            Text(
+                                                text = if (editingReviewId != null) "Actualizar reseña" else "Publicar reseña",
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
+                    // ── Section header ─────────────────────────────────────
                     item {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .widthIn(max = 760.dp)
                                 .padding(top = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
                                 text = "Últimas reseñas",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
                             if (reviews.isNotEmpty()) {
                                 Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    shape = CircleShape
+                                    shape = RoundedCornerShape(50),
+                                    color = colorPrimary.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.25f))
                                 ) {
                                     Text(
                                         text = "${reviews.size}",
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        color = colorPrimary,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -492,133 +508,149 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                         }
                     }
 
+                    // ── Review list ────────────────────────────────────────
                     if (reviews.isEmpty()) {
                         item {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .widthIn(max = 760.dp)
                                     .padding(vertical = 32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Todavía no hay reseñas publicadas.",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    "Todavía no hay reseñas publicadas.",
+                                    color = colorOnSurfaceVariant
                                 )
                             }
                         }
                     } else {
                         items(reviews) { review ->
-                            ReviewCard(review = review)
+                            ReviewCard(
+                                review = review,
+                                modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
+                            )
                         }
                     }
                 }
             }
         }
-
-        AppSnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
     }
 }
 
 @Composable
-private fun ReviewCard(review: ReviewItem) {
+private fun ReviewCard(review: ReviewItem, modifier: Modifier = Modifier) {
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val colorPrimary = MaterialTheme.colorScheme.primary
+
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(2.dp, RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f)),
+        shadowElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Header row: avatar + name/pintxo + stars
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = CircleShape
-                        )
-                        .clip(CircleShape),
-                    contentAlignment = Alignment.Center
+                // Avatar
+                Surface(
+                    modifier = Modifier.size(44.dp),
+                    shape = CircleShape,
+                    color = colorPrimary.copy(alpha = 0.12f),
+                    border = BorderStroke(1.5.dp, colorPrimary.copy(alpha = 0.25f))
                 ) {
-                    if (review.photoUrl.isNotBlank()) {
-                        SubcomposeAsyncImage(
-                            model = review.photoUrl,
-                            contentDescription = null,
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape),
-                            error = {
-                                Text(
-                                    text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        )
-                    } else {
-                        Text(
-                            text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                    Box(contentAlignment = Alignment.Center) {
+                        if (review.photoUrl.isNotBlank()) {
+                            SubcomposeAsyncImage(
+                                model = review.photoUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(44.dp).clip(CircleShape),
+                                error = {
+                                    Text(
+                                        text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = colorPrimary
+                                    )
+                                }
+                            )
+                        } else {
+                            Text(
+                                text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = colorPrimary
+                            )
+                        }
                     }
                 }
 
-                Column(modifier = Modifier.weight(1f)) {
+                // Name + pintxo name
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = review.userName,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = review.pintxoName,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colorPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    (1..5).forEach { idx ->
+                // Star rating badge
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFFFC107).copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, Color(0xFFFFC107).copy(alpha = 0.4f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
                         Icon(
-                            imageVector = if (idx <= review.stars) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                            imageVector = Icons.Filled.Star,
                             contentDescription = null,
-                            tint = if (idx <= review.stars) Color(0xFFFFC107)
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f),
-                            modifier = Modifier.size(16.dp)
+                            tint = Color(0xFFFFC107),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "${review.stars}",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF8B6914)
                         )
                     }
                 }
             }
 
+            // Divider
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
             )
 
+            // Review text
             Text(
                 text = review.text,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 20.sp
+                color = colorOnSurfaceVariant,
+                lineHeight = 22.sp
             )
         }
     }
