@@ -394,9 +394,17 @@ fun UserProfileScreen(
                                     coroutineScope.launch {
                                         isSavingProfile = true
                                         userRepository.updateCommentsEnabled(targetUid, commentsEnabled)
-                                        val uploadedUrl = if (selectedProfileImageUri != null) ImageRepository.uploadImage(context, selectedProfileImageUri!!, "pintxomatch/profiles") else user?.photoUrl?.toString()
+                                        val oldImageUrl = user?.photoUrl?.toString()
+                                        val uploadedUrl = if (selectedProfileImageUri != null) ImageRepository.uploadImage(context, selectedProfileImageUri!!, "pintxomatch/profiles") else oldImageUrl
                                         val updates = userProfileChangeRequest { displayName = trimmedName; if (!uploadedUrl.isNullOrBlank()) photoUri = Uri.parse(uploadedUrl) }
                                         user?.updateProfile(updates)?.addOnSuccessListener {
+                                            // Delete old image if it was replaced with a new one
+                                            if (selectedProfileImageUri != null && !oldImageUrl.isNullOrBlank() && uploadedUrl != oldImageUrl) {
+                                                val oldId = ImageRepository.extractPublicIdFromUrl(oldImageUrl)
+                                                if (!oldId.isNullOrBlank()) {
+                                                    coroutineScope.launch { ImageRepository.deleteImageByToken(oldId) }
+                                                }
+                                            }
                                             isSavingProfile = false; isEditing = false; selectedProfileImageUri = null; alertMessage = "Perfil actualizado"
                                         }
                                     }
