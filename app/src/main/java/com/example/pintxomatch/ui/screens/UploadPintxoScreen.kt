@@ -14,8 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,7 +33,6 @@ import com.example.pintxomatch.data.repository.ImageRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import java.io.File
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.background
@@ -118,322 +116,336 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
         }
     }
 
-    val colorPrimary = MaterialTheme.colorScheme.primary
-    val colorSurface = MaterialTheme.colorScheme.surface
     val colorBackground = MaterialTheme.colorScheme.background
     val colorOnSurface = MaterialTheme.colorScheme.onSurface
     val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val colorContainer = MaterialTheme.colorScheme.surfaceContainerHigh
-    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(colorBackground)) {
-        val maxWidth = maxWidth
-        val isTablet = maxWidth > 600.dp
-        
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // IMMERSIVE HEADER (Adaptive)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (isTablet) 320.dp else 260.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(colorPrimary.copy(alpha = 0.8f), colorBackground)
-                        )
-                    )
-            ) {
-                // Top Navigation
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 24.dp, start = 16.dp, end = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        onClick = onNavigateBack,
-                        shape = CircleShape,
-                        color = Color.Black.copy(alpha = 0.05f),
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.ArrowBack, "Volver", tint = colorOnSurface, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        "SUBIR EXPERIENCIA",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.2.sp,
-                        color = colorOnSurface
-                    )
-                }
+    val colorPrimary = MaterialTheme.colorScheme.primary
 
-                // HERO IMAGE PREVIEW (Adaptive Width)
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 24.dp)
-                        .offset(y = 40.dp)
-                        .widthIn(max = 500.dp)
-                        .fillMaxWidth()
-                        .height(220.dp),
-                    shape = RoundedCornerShape(32.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
-                ) {
-                    Box(modifier = Modifier.fillMaxSize().background(colorContainer)) {
-                        if (pickedImageUri != null) {
-                            AsyncImage(
-                                model = pickedImageUri,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = colorPrimary.copy(alpha = 0.1f),
-                                    modifier = Modifier.size(64.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            Icons.Default.PhotoCamera, 
-                                            null, 
-                                            modifier = Modifier.size(32.dp), 
-                                            tint = colorPrimary
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
+    fun publishPintxo() {
+        if (nombrePintxo.isBlank()) {
+            alertMessage = "Faltan datos clave"
+            return
+        }
+
+        coroutineScope.launch {
+            isUploading = true
+            val uploadAttempt = when {
+                pickedImageUri != null -> ImageRepository.uploadImageAttempt(context, pickedImageUri!!)
+                else -> null
+            }
+            val uploadResult = uploadAttempt?.result
+            val finalImageUrl = uploadResult?.secureUrl
+
+            if (finalImageUrl.isNullOrBlank()) {
+                isUploading = false
+                alertMessage = if (pickedImageUri == null) {
+                    "Selecciona una foto"
+                } else {
+                    uploadAttempt?.errorMessage ?: "Error al subir la imagen"
+                }
+                return@launch
+            }
+
+            val db = FirebaseFirestore.getInstance()
+            val currentUser = AuthRepository.currentUser
+            val pintxo = hashMapOf(
+                "nombre" to nombrePintxo,
+                "bar" to nombreBar,
+                "ubicacion" to ubicacion,
+                "precio" to (precio.toDoubleOrNull() ?: 0.0),
+                "imageUrl" to finalImageUrl,
+                "imagePublicId" to (uploadResult?.publicId ?: ""),
+                "imageDeleteToken" to (uploadResult?.deleteToken ?: ""),
+                "imageDeleteTokenCreatedAt" to (uploadResult?.uploadedAtMillis ?: 0L),
+                "uploaderUid" to (currentUser?.uid ?: ""),
+                "uploaderEmail" to (currentUser?.email ?: ""),
+                "uploaderDisplayName" to (currentUser?.displayName ?: currentUser?.email?.substringBefore("@") ?: ""),
+                "uploaderPhotoUrl" to (currentUser?.photoUrl?.toString() ?: ""),
+                "timestamp" to System.currentTimeMillis()
+            )
+
+            db.collection("Pintxos").add(pintxo)
+                .addOnSuccessListener {
+                    isUploading = false
+                    alertMessage = "Pintxo publicado con éxito"
+                    onNavigateBack()
+                }
+                .addOnFailureListener {
+                    isUploading = false
+                    alertMessage = "Error al subir"
+                }
+        }
+    }
+
+    Scaffold(
+        containerColor = colorBackground,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text = "Subir pintxo",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    Surface(
+                        onClick = { if (!isUploading) publishPintxo() },
+                        shape = RoundedCornerShape(50),
+                        color = colorPrimary.copy(alpha = 0.14f),
+                        border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.28f)),
+                        modifier = Modifier.padding(end = 10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .height(34.dp)
+                                .padding(horizontal = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isUploading) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
                                 Text(
-                                    "CAPTURA EL MOMENTO",
+                                    text = "Publicar",
                                     style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 1.sp,
-                                    color = colorOnSurfaceVariant
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colorPrimary
                                 )
                             }
                         }
                     }
-                }
-            }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = colorBackground
+                )
+            )
+        },
+        snackbarHost = {
+            AppSnackbarHost(hostState = snackbarHostState)
+        }
+    ) { paddingValues ->
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            val isTablet = maxWidth > 700.dp
 
-            Spacer(modifier = Modifier.height(64.dp))
-
-            // CONTENT WRAPPER (Max Width for Tablets)
             Column(
                 modifier = Modifier
-                    .widthIn(max = 600.dp)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // SELECTION ACTIONS
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = if (isTablet) 760.dp else 600.dp)
                 ) {
-                    ActionCard(
-                        title = "CÁMARA",
-                        icon = Icons.Default.PhotoCamera,
-                        color = colorPrimary,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            val hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                            if (hasCameraPermission) launchCameraCapture() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    )
-                    ActionCard(
-                        title = "GALERÍA",
-                        icon = Icons.Default.Image,
-                        color = colorPrimary,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        }
-                    )
-                }
+                    Spacer(modifier = Modifier.height(18.dp))
 
-                Spacer(modifier = Modifier.height(32.dp))
+                    UploadImagePanel(imageUri = pickedImageUri)
 
-                // THE EXPERIENCE CARD (Grouped form)
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(32.dp),
-                    color = colorSurface,
-                    border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.05f)),
-                    shadowElevation = 2.dp
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            "DETALLES DEL PINTXO",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.5.sp,
-                            color = colorPrimary.copy(alpha = 0.8f)
+                        ActionCard(
+                            title = "Abrir cámara",
+                            icon = Icons.Default.PhotoCamera,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                val hasCameraPermission = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.CAMERA
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (hasCameraPermission) launchCameraCapture() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
                         )
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        PremiumInput(
-                            value = nombrePintxo,
-                            onValueChange = { nombrePintxo = it },
-                            label = "Nombre del Pintxo",
-                            icon = Icons.Default.Restaurant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        PremiumInput(
-                            value = nombreBar,
-                            onValueChange = { nombreBar = it },
-                            label = "Nombre del Bar",
-                            icon = Icons.Default.Store
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        PremiumInput(
-                            value = ubicacion,
-                            onValueChange = { ubicacion = it },
-                            label = "Ubicación",
-                            icon = Icons.Default.LocationOn
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        PremiumInput(
-                            value = precio,
-                            onValueChange = { precio = it },
-                            label = "Precio (€)",
-                            icon = Icons.Default.Euro,
-                            keyboardType = KeyboardType.Decimal
+                        ActionCard(
+                            title = "Elegir galería",
+                            icon = Icons.Default.Image,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(40.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
-                // PUBLISH ACTION
-                Button(
-                    onClick = {
-                        if (nombrePintxo.isBlank()) {
-                            alertMessage = "Faltan datos clave"
-                            return@Button
-                        }
-
-                        coroutineScope.launch {
-                            isUploading = true
-                            val uploadAttempt = when {
-                                pickedImageUri != null -> ImageRepository.uploadImageAttempt(context, pickedImageUri!!)
-                                else -> null
-                            }
-                            val uploadResult = uploadAttempt?.result
-                            val finalImageUrl = uploadResult?.secureUrl
-
-                            if (finalImageUrl.isNullOrBlank()) {
-                                isUploading = false
-                                alertMessage = if (pickedImageUri == null) {
-                                    "Selecciona una foto"
-                                } else {
-                                    uploadAttempt?.errorMessage ?: "Error al subir la imagen"
-                                }
-                                return@launch
-                            }
-
-                            val db = FirebaseFirestore.getInstance()
-                            val currentUser = AuthRepository.currentUser
-                            val pintxo = hashMapOf(
-                                "nombre" to nombrePintxo,
-                                "bar" to nombreBar,
-                                "ubicacion" to ubicacion,
-                                "precio" to (precio.toDoubleOrNull() ?: 0.0),
-                                "imageUrl" to finalImageUrl,
-                                "imagePublicId" to (uploadResult?.publicId ?: ""),
-                                "imageDeleteToken" to (uploadResult?.deleteToken ?: ""),
-                                "imageDeleteTokenCreatedAt" to (uploadResult?.uploadedAtMillis ?: 0L),
-                                "uploaderUid" to (currentUser?.uid ?: ""),
-                                "uploaderEmail" to (currentUser?.email ?: ""),
-                                "uploaderDisplayName" to (currentUser?.displayName ?: currentUser?.email?.substringBefore("@") ?: ""),
-                                "uploaderPhotoUrl" to (currentUser?.photoUrl?.toString() ?: ""),
-                                "timestamp" to System.currentTimeMillis()
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.14f)),
+                        shadowElevation = 1.dp
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Text(
+                                text = "Detalles",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colorOnSurface
                             )
+                            Spacer(modifier = Modifier.height(14.dp))
 
-                            db.collection("Pintxos").add(pintxo)
-                                .addOnSuccessListener {
-                                    isUploading = false
-                                    alertMessage = "Pintxo publicado con éxito"
-                                    onNavigateBack()
-                                }
-                                .addOnFailureListener {
-                                    isUploading = false
-                                    alertMessage = "Error al subir"
-                                }
+                            PremiumInput(
+                                value = nombrePintxo,
+                                onValueChange = { nombrePintxo = it },
+                                label = "Nombre del pintxo",
+                                icon = Icons.Default.Restaurant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            PremiumInput(
+                                value = nombreBar,
+                                onValueChange = { nombreBar = it },
+                                label = "Nombre del bar",
+                                icon = Icons.Default.Store
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            PremiumInput(
+                                value = ubicacion,
+                                onValueChange = { ubicacion = it },
+                                label = "Ubicación",
+                                icon = Icons.Default.LocationOn
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            PremiumInput(
+                                value = precio,
+                                onValueChange = { precio = it },
+                                label = "Precio (€)",
+                                icon = Icons.Default.Euro,
+                                keyboardType = KeyboardType.Decimal
+                            )
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(68.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = colorPrimary),
-                    enabled = !isUploading,
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
-                ) {
-                    if (isUploading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                    } else {
-                        Text(
-                            "PUBLICAR EXPERIENCIA", 
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.2.sp
-                        )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(80.dp))
+                    Spacer(modifier = Modifier.height(28.dp))
+                }
             }
         }
-        
-        AppSnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
-    } // end BoxWithConstraints
+    }
+}
+
+@Composable
+private fun UploadImagePanel(imageUri: Uri?) {
+    val colorOnSurface = MaterialTheme.colorScheme.onSurface
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.22f))
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (imageUri != null) {
+                AsyncImage(
+                    model = imageUri,
+                    contentDescription = "Vista previa",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .align(Alignment.BottomStart),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                    border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.2f))
+                ) {
+                    Text(
+                        text = "Foto lista",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colorOnSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Surface(
+                        modifier = Modifier.size(50.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = colorOnSurface,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Añade una foto de tu pintxo",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colorOnSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Usa cámara o galería",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colorOnSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
 private fun ActionCard(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val colorOnSurface = MaterialTheme.colorScheme.onSurface
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     Card(
         modifier = modifier
             .height(100.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = color.copy(alpha = 0.08f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.1f))
+        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.14f))
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(28.dp))
+            Icon(icon, null, tint = colorOnSurface, modifier = Modifier.size(26.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 title, 
                 style = MaterialTheme.typography.labelSmall, 
-                fontWeight = FontWeight.Black,
-                color = color
+                fontWeight = FontWeight.Bold,
+                color = colorOnSurface
             )
         }
     }
