@@ -47,7 +47,12 @@ class PintxoRepository {
             val previousDeleteTokenCreatedAt = document.getLong("imageDeleteTokenCreatedAt")
 
             val uploadResult = if (newImageUri != null) {
-                val uploadAttempt = ImageRepository.uploadImageAttempt(context, newImageUri)
+                val uploadAttempt = ImageRepository.uploadImageAttempt(
+                    context = context,
+                    uri = newImageUri,
+                    preferredPublicId = previousPublicId,
+                    requireOverwriteWhenPreferredPublicId = false
+                )
                 uploadAttempt.result
                     ?: return PintxoMutationResult(
                         false,
@@ -56,6 +61,10 @@ class PintxoRepository {
             } else {
                 null
             }
+
+            val imageReplacedInPlace = uploadResult != null
+                && !previousPublicId.isNullOrBlank()
+                && uploadResult.publicId == previousPublicId
 
             val updates = mutableMapOf<String, Any>(
                 "nombre" to nombrePintxo,
@@ -73,7 +82,7 @@ class PintxoRepository {
 
             pintxosCollection.document(pintxoId).update(updates).await()
 
-            val cleanupQueued = if (uploadResult != null) {
+            val cleanupQueued = if (uploadResult != null && !imageReplacedInPlace) {
                 cleanupReplacedImage(
                     pintxoId = pintxoId,
                     imageUrl = previousImageUrl,
@@ -85,7 +94,13 @@ class PintxoRepository {
                 false
             }
 
-            PintxoMutationResult(true, "Pintxo actualizado", cleanupQueued)
+            val successMessage = if (cleanupQueued) {
+                "Pintxo actualizado. Borrado de imagen anterior en cola"
+            } else {
+                "Pintxo actualizado"
+            }
+
+            PintxoMutationResult(true, successMessage, cleanupQueued)
         } catch (e: Exception) {
             PintxoMutationResult(false, e.localizedMessage ?: "Error al actualizar el pintxo")
         }
@@ -298,7 +313,7 @@ class PintxoRepository {
         requestedByUid: String?,
         reason: String
     ): Boolean {
-        val canDeleteByToken = !deleteToken.isNullOrBlank() && ImageRepository.isDeleteTokenFresh(deleteTokenCreatedAt)
+        val canDeleteByToken = !deleteToken.isNullOrBlank()
         if (canDeleteByToken) {
             val deleted = ImageRepository.deleteImageByToken(deleteToken!!)
             if (deleted) {

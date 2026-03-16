@@ -52,21 +52,36 @@ object ImageRepository {
     suspend fun uploadImageAttempt(
         context: Context,
         uri: Uri,
-        folder: String = "pintxomatch"
+        folder: String = "pintxomatch",
+        preferredPublicId: String? = null,
+        requireOverwriteWhenPreferredPublicId: Boolean = false
     ): ImageUploadAttempt {
         val payload = withContext(Dispatchers.IO) {
             optimizeImageForUpload(context, uri)
         } ?: return ImageUploadAttempt(result = null, errorMessage = "No se pudo leer la imagen seleccionada")
 
-        return uploadBytes(payload, folder)
+        return uploadBytes(
+            payload = payload,
+            folder = folder,
+            preferredPublicId = preferredPublicId,
+            requireOverwriteWhenPreferredPublicId = requireOverwriteWhenPreferredPublicId
+        )
     }
 
     suspend fun uploadImageResult(
         context: Context,
         uri: Uri,
-        folder: String = "pintxomatch"
+        folder: String = "pintxomatch",
+        preferredPublicId: String? = null,
+        requireOverwriteWhenPreferredPublicId: Boolean = false
     ): ImageUploadResult? {
-        return uploadImageAttempt(context, uri, folder).result
+        return uploadImageAttempt(
+            context = context,
+            uri = uri,
+            folder = folder,
+            preferredPublicId = preferredPublicId,
+            requireOverwriteWhenPreferredPublicId = requireOverwriteWhenPreferredPublicId
+        ).result
     }
 
     private fun optimizeImageForUpload(context: Context, uri: Uri): UploadPayload? {
@@ -235,25 +250,58 @@ object ImageRepository {
         }
     }
 
-    private suspend fun uploadBytes(payload: UploadPayload, folder: String): ImageUploadAttempt = withContext(Dispatchers.IO) {
-        val firstAttempt = uploadBytesInternal(payload, folder, includeDeleteToken = true)
-        if (firstAttempt.result != null) {
-            return@withContext firstAttempt
+    private suspend fun uploadBytes(
+        payload: UploadPayload,
+        folder: String,
+        preferredPublicId: String?,
+        requireOverwriteWhenPreferredPublicId: Boolean
+    ): ImageUploadAttempt = withContext(Dispatchers.IO) {
+        fun tryUploadSequence(targetPublicId: String?): ImageUploadAttempt {
+            val firstAttempt = uploadBytesInternal(
+                payload = payload,
+                folder = folder,
+                includeDeleteToken = true,
+                preferredPublicId = targetPublicId
+            )
+            if (firstAttempt.result != null) {
+                return firstAttempt
+            }
+
+            val secondAttempt = uploadBytesInternal(
+                payload = payload,
+                folder = folder,
+                includeDeleteToken = false,
+                preferredPublicId = targetPublicId
+            )
+            if (secondAttempt.result != null) {
+                return secondAttempt
+            }
+
+            val finalMessage = secondAttempt.errorMessage ?: firstAttempt.errorMessage ?: "Error al subir la imagen"
+            return ImageUploadAttempt(result = null, errorMessage = finalMessage)
         }
 
-        val secondAttempt = uploadBytesInternal(payload, folder, includeDeleteToken = false)
-        if (secondAttempt.result != null) {
-            return@withContext secondAttempt
+        // First try replacing existing image in-place when a previous Cloudinary public_id is available.
+        if (!preferredPublicId.isNullOrBlank()) {
+            val overwriteAttempt = tryUploadSequence(preferredPublicId)
+            if (overwriteAttempt.result != null) {
+                return@withContext overwriteAttempt
+            }
+
+            if (requireOverwriteWhenPreferredPublicId) {
+                return@withContext overwriteAttempt
+            }
         }
 
-        val finalMessage = secondAttempt.errorMessage ?: firstAttempt.errorMessage ?: "Error al subir la imagen"
-        ImageUploadAttempt(result = null, errorMessage = finalMessage)
+        // Fallback to regular upload if overwrite is not allowed by preset/policy.
+        tryUploadSequence(null)
     }
 
     private fun uploadBytesInternal(
         payload: UploadPayload,
         folder: String,
-        includeDeleteToken: Boolean
+        includeDeleteToken: Boolean,
+        preferredPublicId: String?
     ): ImageUploadAttempt {
         val fileName = "gallery_${System.currentTimeMillis()}.${payload.fileExtension}"
         return try {
@@ -274,7 +322,13 @@ object ImageRepository {
                 }
 
                 writeTextPart("upload_preset", UPLOAD_PRESET)
-                writeTextPart("folder", folder)
+                if (preferredPublicId.isNullOrBlank()) {
+                    writeTextPart("folder", folder)
+                } else {
+                    writeTextPart("public_id", preferredPublicId)
+                    writeTextPart("overwrite", "true")
+                    writeTextPart("invalidate", "true")
+                }
                 if (includeDeleteToken) {
                     writeTextPart("return_delete_token", "true")
                 }
