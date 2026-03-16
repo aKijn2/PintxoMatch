@@ -154,10 +154,10 @@ class PintxoRepository {
                     barName = doc.getString("bar") ?: "",
                     location = doc.getString("ubicacion") ?: "",
                     price = doc.getDouble("precio") ?: 0.0,
-                    imageUrl = doc.getString("imageUrl") ?: "",
+                    imageUrl = ImageRepository.normalizeImageUrlForCurrentProvider(doc.getString("imageUrl")) ?: "",
                     uploaderUid = doc.getString("uploaderUid") ?: "",
                     uploaderDisplayName = doc.getString("uploaderDisplayName") ?: "Usuario Anónimo",
-                    uploaderPhotoUrl = doc.getString("uploaderPhotoUrl") ?: ""
+                    uploaderPhotoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(doc.getString("uploaderPhotoUrl")) ?: ""
                 )
             }
         } catch (e: Exception) {
@@ -187,13 +187,13 @@ class PintxoRepository {
                     barName = doc.getString("bar") ?: "",
                     location = doc.getString("ubicacion") ?: "",
                     price = doc.getDouble("precio") ?: 0.0,
-                    imageUrl = doc.getString("imageUrl") ?: "",
+                    imageUrl = ImageRepository.normalizeImageUrlForCurrentProvider(doc.getString("imageUrl")) ?: "",
                     averageRating = averageRating,
                     ratingCount = ratingCount,
                     userRating = ratings[uid] ?: 0,
                     uploaderUid = doc.getString("uploaderUid") ?: "",
                     uploaderDisplayName = doc.getString("uploaderDisplayName") ?: "Usuario Anónimo",
-                    uploaderPhotoUrl = doc.getString("uploaderPhotoUrl") ?: ""
+                    uploaderPhotoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(doc.getString("uploaderPhotoUrl")) ?: ""
                 )
             }
         } catch (e: Exception) {
@@ -210,7 +210,9 @@ class PintxoRepository {
             }
 
             val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-            val currentPhotoUrl = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.photoUrl?.toString().orEmpty()
+            val currentPhotoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(
+                com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()
+            ).orEmpty()
             val currentDisplayName = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()
 
             val users = grouped
@@ -222,7 +224,7 @@ class PintxoRepository {
                         ?: if (uid == currentUid && currentDisplayName.isNotBlank()) currentDisplayName
                         else first?.getString("uploaderEmail")?.substringBefore("@")
                         ?: "Usuario"
-                    val photoUrl = first?.getString("uploaderPhotoUrl")
+                    val photoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(first?.getString("uploaderPhotoUrl"))
                         ?.takeIf { it.isNotBlank() }
                         ?: if (uid == currentUid) currentPhotoUrl else ""
 

@@ -20,8 +20,8 @@ android {
 
         // Image storage backend selector: "cloudinary" or "local".
         buildConfigField("String", "IMAGE_PROVIDER", "\"local\"")
-        // adb reverse tcp:8080 tcp:8080 tunnels emulator localhost:8080 → host:8080.
-        buildConfigField("String", "LOCAL_IMAGE_BASE_URL", "\"http://localhost:8080\"")
+        // Cloudflare tunnel base URL for local image server access from physical devices.
+        buildConfigField("String", "LOCAL_IMAGE_BASE_URL", "\"https://paperback-valium-reliable-territories.trycloudflare.com\"")
         buildConfigField("String", "LOCAL_IMAGE_API_KEY", "\"pintxomatch-local-dev-key\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

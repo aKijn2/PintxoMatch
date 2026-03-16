@@ -52,7 +52,7 @@ class UserRepository {
             val doc = pintxos.documents.firstOrNull()
             
             val displayName = doc?.getString("uploaderDisplayName") ?: "Usuario"
-            val photoUrl = doc?.getString("uploaderPhotoUrl") ?: ""
+            val photoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(doc?.getString("uploaderPhotoUrl")) ?: ""
 
             LeaderboardUser(
                 uid = uid,
@@ -146,7 +146,7 @@ class UserRepository {
                     id = doc.id,
                     senderId = doc.getString("senderId") ?: "",
                     senderName = doc.getString("senderName") ?: "Anónimo",
-                    senderPhotoUrl = doc.getString("senderPhotoUrl") ?: "",
+                    senderPhotoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(doc.getString("senderPhotoUrl")) ?: "",
                     receiverId = doc.getString("receiverId") ?: "",
                     text = doc.getString("text") ?: "",
                     timestamp = doc.getLong("timestamp") ?: 0L

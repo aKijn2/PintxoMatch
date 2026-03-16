@@ -209,7 +209,9 @@ fun UserProfileScreen(
                             .fillMaxWidth()
                             .height(if (isWide) 320.dp else 280.dp)
                     ) {
-                        val displayPhotoUrl = if (isMyProfile) user?.photoUrl?.toString() else publicProfile?.profileImageUrl
+                        val displayPhotoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(
+                            if (isMyProfile) user?.photoUrl?.toString() else publicProfile?.profileImageUrl
+                        )
                         val finalPhotoUrl = displayPhotoUrl.takeIf { !it.isNullOrBlank() } ?: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=1200&q=80"
                         
                         // Banner Image (Blurred & Darkened)
@@ -302,9 +304,13 @@ fun UserProfileScreen(
                                         .clip(CircleShape)
                                         .background(colorSurface)
                                 ) {
-                                    val avatarUrl = if (isMyProfile && selectedProfileImageUri != null) selectedProfileImageUri 
-                                                    else if (isMyProfile) user?.photoUrl 
-                                                    else publicProfile?.profileImageUrl
+                                    val avatarUrl = if (isMyProfile && selectedProfileImageUri != null) {
+                                        selectedProfileImageUri
+                                    } else {
+                                        ImageRepository.normalizeImageUrlForCurrentProvider(
+                                            if (isMyProfile) user?.photoUrl?.toString() else publicProfile?.profileImageUrl
+                                        )
+                                    }
                                     coil.compose.AsyncImage(
                                         model = avatarUrl ?: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80",
                                         contentDescription = "Foto de perfil",

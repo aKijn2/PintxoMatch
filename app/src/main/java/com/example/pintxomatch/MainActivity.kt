@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.example.pintxomatch.data.model.Pintxo
+import com.example.pintxomatch.data.repository.ImageRepository
 import com.example.pintxomatch.navigation.AppNavigation
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
@@ -120,7 +121,7 @@ fun MainSwipeScreen(
             barName = snapshot.getString("bar") ?: "Bar desconocido",
             location = snapshot.getString("ubicacion") ?: "Gipuzkoa",
             price = snapshot.getDouble("precio") ?: 0.0,
-            imageUrl = snapshot.getString("imageUrl") ?: "",
+            imageUrl = ImageRepository.normalizeImageUrlForCurrentProvider(snapshot.getString("imageUrl")) ?: "",
             averageRating = averageRating,
             ratingCount = ratingCount,
             userRating = currentUid?.let { ratings[it] } ?: 0

@@ -233,6 +233,26 @@ object ImageRepository {
         }
     }
 
+    fun normalizeImageUrlForCurrentProvider(imageUrl: String?): String? {
+        if (imageUrl.isNullOrBlank()) return imageUrl
+        if (!isUsingLocalProvider()) return imageUrl
+
+        val rawUrl = imageUrl.trim()
+        val legacyPrefixes = listOf(
+            "http://localhost:8080",
+            "https://localhost:8080",
+            "http://10.0.2.2:8080",
+            "https://10.0.2.2:8080"
+        )
+
+        val matchedPrefix = legacyPrefixes.firstOrNull { rawUrl.startsWith(it, ignoreCase = true) }
+            ?: return imageUrl
+
+        val suffix = rawUrl.substring(matchedPrefix.length)
+        val base = BuildConfig.LOCAL_IMAGE_BASE_URL.trimEnd('/')
+        return if (suffix.isBlank()) base else "$base$suffix"
+    }
+
     fun isDeleteTokenFresh(uploadedAtMillis: Long?): Boolean {
         if (uploadedAtMillis == null || uploadedAtMillis <= 0L) return false
         val ageMillis = System.currentTimeMillis() - uploadedAtMillis

@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import com.example.pintxomatch.data.model.Pintxo
+import com.example.pintxomatch.data.repository.ImageRepository
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.google.firebase.auth.FirebaseAuth
@@ -100,7 +101,9 @@ fun HomeReviewScreen(
     var isLoading by remember { mutableStateOf(true) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val userPhotoUrl = remember { auth.currentUser?.photoUrl?.toString() }
+    val userPhotoUrl = remember {
+        ImageRepository.normalizeImageUrlForCurrentProvider(auth.currentUser?.photoUrl?.toString())
+    }
 
     @Composable
     fun StarBurstEffect(trigger: Int) {
@@ -185,13 +188,13 @@ fun HomeReviewScreen(
             barName = snapshot.getString("bar") ?: "Bar desconocido",
             location = snapshot.getString("ubicacion") ?: "Gipuzkoa",
             price = snapshot.getDouble("precio") ?: 0.0,
-            imageUrl = snapshot.getString("imageUrl") ?: "",
+            imageUrl = ImageRepository.normalizeImageUrlForCurrentProvider(snapshot.getString("imageUrl")) ?: "",
             averageRating = averageRating,
             ratingCount = ratingCount,
             userRating = currentUid?.let { ratings[it] } ?: 0,
             uploaderUid = snapshot.getString("uploaderUid") ?: "",
             uploaderDisplayName = snapshot.getString("uploaderDisplayName") ?: "Usuario Anónimo",
-            uploaderPhotoUrl = snapshot.getString("uploaderPhotoUrl") ?: ""
+            uploaderPhotoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(snapshot.getString("uploaderPhotoUrl")) ?: ""
         )
     }
 

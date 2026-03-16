@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.example.pintxomatch.data.repository.ImageRepository
 
 data class ReviewItem(
     val id: String,
@@ -139,7 +140,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                 userUid = doc.getString("userUid") ?: "",
                                 pintxoName = doc.getString("pintxoName") ?: "Pintxo",
                                 userName = doc.getString("userName") ?: "Usuario",
-                                photoUrl = doc.getString("photoUrl") ?: "",
+                                photoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(doc.getString("photoUrl")) ?: "",
                                 stars = stars.coerceIn(1, 5),
                                 text = doc.getString("text") ?: "",
                                 createdAt = doc.getLong("createdAt") ?: 0L
@@ -182,7 +183,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
             "pintxoName" to selectedPintxoName,
             "userUid" to uid,
             "userName" to userName,
-            "photoUrl" to (user.photoUrl?.toString() ?: ""),
+            "photoUrl" to (ImageRepository.normalizeImageUrlForCurrentProvider(user.photoUrl?.toString()) ?: ""),
             "stars" to selectedStars,
             "text" to cleanText,
             "createdAt" to System.currentTimeMillis()
