@@ -48,9 +48,9 @@ Integrated map experience powered by **OSM** and **Google Maps Routing**.
 ## 📱 Interface Preview
 
 <p align="center">
-  <img src="img/Screenshot_20260306_132808.png" alt="PintxoMatch screen 1" width="220" />
-  <img src="img/Screenshot_20260306_133207.png" alt="PintxoMatch screen 2" width="220" />
-  <img src="img/Screenshot_20260306_133154.png" alt="PintxoMatch screen 3" width="220" />
+  <img src="img/home.jpeg" alt="PintxoMatch screen 1" width="220" />
+  <img src="img/profile.jpeg" alt="PintxoMatch screen 2" width="220" />
+  <img src="img/settings.jpeg" alt="PintxoMatch screen 3" width="220" />
 </p>
 
 ---
