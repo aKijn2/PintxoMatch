@@ -229,6 +229,14 @@ fun SupportChatScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colorOnSurfaceVariant
                                 )
+                                if (state.ticketTitle.isNotBlank()) {
+                                    Text(
+                                        text = "Ticket: ${state.ticketTitle}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                                 Surface(
                                     shape = RoundedCornerShape(50),
                                     color = if (isResolved) colorPrimary.copy(alpha = 0.14f)

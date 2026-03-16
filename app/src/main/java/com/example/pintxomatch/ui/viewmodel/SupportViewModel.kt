@@ -49,7 +49,8 @@ sealed class SupportChatUiState {
     object Loading : SupportChatUiState()
     data class Active(
         val messages: List<SupportUiMessage>,
-        val ticketStatus: String
+        val ticketStatus: String,
+        val ticketTitle: String
     ) : SupportChatUiState()
     data class Error(val message: String) : SupportChatUiState()
 }
@@ -64,6 +65,7 @@ class SupportChatViewModel(
 
     private var messages = listOf<SupportUiMessage>()
     private var ticketStatus = "open"
+    private var ticketTitle = ""
 
     val effectiveThreadId: String
         get() = providedThreadId ?: AuthRepository.currentUserId.orEmpty()
@@ -79,6 +81,15 @@ class SupportChatViewModel(
         }
 
         viewModelScope.launch {
+            val draftedTitle = SupportTicketDraftStore.pendingTitle?.trim().orEmpty()
+            if (draftedTitle.isNotBlank()) {
+                try {
+                    repository.ensureSupportTicketTitle(effectiveThreadId, draftedTitle)
+                } catch (_: Exception) {
+                }
+                SupportTicketDraftStore.pendingTitle = null
+            }
+
             launch {
                 repository.getSupportMessagesFlow(effectiveThreadId).collect { msgsMap ->
                     messages = msgsMap.map { SupportUiMessage(it.key, it.value) }.sortedBy { it.payload.timestamp }
@@ -91,11 +102,17 @@ class SupportChatViewModel(
                     emitActive()
                 }
             }
+            launch {
+                repository.getSupportTicketTitleFlow(effectiveThreadId).collect { title ->
+                    ticketTitle = title
+                    emitActive()
+                }
+            }
         }
     }
 
     private fun emitActive() {
-        _uiState.value = SupportChatUiState.Active(messages, ticketStatus)
+        _uiState.value = SupportChatUiState.Active(messages, ticketStatus, ticketTitle)
     }
 
     fun sendMessage(text: String) {

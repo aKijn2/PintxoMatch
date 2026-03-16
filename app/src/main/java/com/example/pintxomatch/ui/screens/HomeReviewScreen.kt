@@ -32,9 +32,11 @@ import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -45,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,12 +69,15 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
+import com.example.pintxomatch.data.repository.ChatRepository
 import kotlin.math.absoluteValue
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.mutableIntStateOf
 import kotlin.random.Random
 import androidx.compose.animation.core.Animatable
+import com.example.pintxomatch.ui.viewmodel.SupportTicketDraftStore
+import kotlinx.coroutines.launch
 
 private data class HomeRatingUpdate(
     val averageRating: Double,
@@ -100,7 +106,12 @@ fun HomeReviewScreen(
     var selectedFooterTab by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
+    var showSupportTicketDialog by remember { mutableStateOf(false) }
+    var supportTicketTitle by remember { mutableStateOf("") }
+    var checkingSupportTicket by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val chatRepository = remember { ChatRepository() }
     val userPhotoUrl = remember {
         ImageRepository.normalizeImageUrlForCurrentProvider(auth.currentUser?.photoUrl?.toString())
     }
@@ -466,7 +477,31 @@ fun HomeReviewScreen(
                                 icon = Icons.Default.SupportAgent,
                                 label = "Soporte",
                                 selected = selectedFooterTab == "soporte",
-                                onClick = { selectedFooterTab = "soporte"; onNavigateToSupport() }
+                                onClick = {
+                                    selectedFooterTab = "soporte"
+                                    val uid = auth.currentUser?.uid
+                                    if (uid.isNullOrBlank()) {
+                                        notify("Inicia sesion para usar soporte")
+                                        return@NavPillItem
+                                    }
+                                    if (checkingSupportTicket) return@NavPillItem
+
+                                    checkingSupportTicket = true
+                                    coroutineScope.launch {
+                                        val alreadyHasTicket = try {
+                                            chatRepository.hasSupportTicket(uid)
+                                        } catch (_: Exception) {
+                                            false
+                                        }
+
+                                        checkingSupportTicket = false
+                                        if (alreadyHasTicket) {
+                                            onNavigateToSupport()
+                                        } else {
+                                            showSupportTicketDialog = true
+                                        }
+                                    }
+                                }
                             )
                         }
                     }
@@ -550,6 +585,52 @@ fun HomeReviewScreen(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.TopCenter)
         )
+
+        if (showSupportTicketDialog) {
+            AlertDialog(
+                onDismissRequest = { showSupportTicketDialog = false },
+                title = { Text("Abrir ticket de soporte") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Describe el tema principal para abrir tu ticket.")
+                        OutlinedTextField(
+                            value = supportTicketTitle,
+                            onValueChange = { supportTicketTitle = it },
+                            singleLine = true,
+                            label = { Text("Título del ticket") },
+                            placeholder = { Text("Ej: Error al subir foto") }
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val finalTitle = supportTicketTitle.trim()
+                            if (finalTitle.isBlank()) {
+                                notify("Escribe un título para continuar")
+                                return@TextButton
+                            }
+                            SupportTicketDraftStore.pendingTitle = finalTitle
+                            showSupportTicketDialog = false
+                            supportTicketTitle = ""
+                            onNavigateToSupport()
+                        }
+                    ) {
+                        Text("Abrir ticket")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showSupportTicketDialog = false
+                            supportTicketTitle = ""
+                        }
+                    ) {
+                        Text("Cancelar")
+                    }
+                }
+            )
+        }
     }
 }
 

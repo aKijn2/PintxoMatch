@@ -164,6 +164,7 @@ class ChatRepository {
                     SupportThreadItem(
                         threadId = id,
                         userName = meta.child("userName").getValue(String::class.java) ?: "Usuario",
+                        ticketTitle = meta.child("ticketTitle").getValue(String::class.java).orEmpty(),
                         userEmail = meta.child("userEmail").getValue(String::class.java) ?: "",
                         lastMessage = meta.child("lastMessage").getValue(String::class.java) ?: "Sin mensajes",
                         status = meta.child("status").getValue(String::class.java) ?: "open",
@@ -212,6 +213,44 @@ class ChatRepository {
         }
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
+    }
+
+    suspend fun hasSupportTicket(threadId: String): Boolean {
+        if (threadId.isBlank()) return false
+        val metaSnapshot = supportChatsRef.child(threadId).child("meta").get().await()
+        return metaSnapshot.exists()
+    }
+
+    fun getSupportTicketTitleFlow(threadId: String): Flow<String> = callbackFlow {
+        val ref = supportChatsRef.child(threadId).child("meta").child("ticketTitle")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val title = snapshot.getValue(String::class.java).orEmpty()
+                trySend(title)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                close(error.toException())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
+
+    suspend fun ensureSupportTicketTitle(threadId: String, title: String) {
+        val normalized = title.trim()
+        if (normalized.isBlank()) return
+
+        val metaRef = supportChatsRef.child(threadId).child("meta")
+        val current = metaRef.child("ticketTitle").get().await().getValue(String::class.java).orEmpty()
+        if (current.isBlank()) {
+            metaRef.updateChildren(
+                mapOf<String, Any>(
+                    "ticketTitle" to normalized,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            ).await()
+        }
     }
 
     suspend fun sendSupportMessage(threadId: String, currentUid: String, email: String, senderName: String, text: String) {

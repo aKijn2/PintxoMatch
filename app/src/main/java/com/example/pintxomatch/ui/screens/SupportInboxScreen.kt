@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.Box
 data class SupportThreadItem(
     val threadId: String,
     val userName: String,
+    val ticketTitle: String,
     val userEmail: String,
     val lastMessage: String,
     val status: String,
@@ -107,6 +108,13 @@ fun SupportInboxScreen(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(item.userName, fontWeight = FontWeight.SemiBold)
+                                            if (item.ticketTitle.isNotBlank()) {
+                                                Text(
+                                                    text = item.ticketTitle,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
                                             Text(
                                                 text = if (item.status == "resolved") "Resuelto" else "Abierto",
                                                 style = MaterialTheme.typography.labelSmall,
