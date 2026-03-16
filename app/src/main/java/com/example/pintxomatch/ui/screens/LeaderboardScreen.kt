@@ -1,9 +1,11 @@
 package com.example.pintxomatch.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,16 +15,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -30,20 +33,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -56,8 +54,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.pintxomatch.data.model.LeaderboardPintxo
 import com.example.pintxomatch.data.model.LeaderboardUser
-import com.example.pintxomatch.data.repository.AuthRepository
-import com.example.pintxomatch.ui.components.AppSnackbarHost
 import com.example.pintxomatch.ui.viewmodel.LeaderboardUiState
 import com.example.pintxomatch.ui.viewmodel.PintxoViewModel
 
@@ -67,11 +63,7 @@ fun LeaderboardScreen(
     onNavigateBack: () -> Unit,
     viewModel: PintxoViewModel = viewModel()
 ) {
-    val currentUid = AuthRepository.currentUserId
     val leaderboardState by viewModel.leaderboardState.collectAsState()
-
-    var alertMessage by remember { mutableStateOf<String?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
     val (users, topRatedPintxos) = when (val state = leaderboardState) {
         is LeaderboardUiState.Success -> state.users to state.pintxos
@@ -79,60 +71,55 @@ fun LeaderboardScreen(
     }
 
     val topCount = users.firstOrNull()?.totalUploads?.coerceAtLeast(1) ?: 1
+    val colorBackground = MaterialTheme.colorScheme.background
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            topBar = {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding(),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 2.dp
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(
-                                Icons.Default.ArrowBack,
-                                contentDescription = "Volver",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Column {
-                            Text(
-                                text = "Ranking",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Top pintxeros y pintxos",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+    Scaffold(
+        containerColor = colorBackground,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text = "Ranking",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = colorBackground
+                )
+            )
+        }
+    ) { padding ->
+        when (leaderboardState) {
+            is LeaderboardUiState.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
                 }
             }
-        ) { padding ->
-            when (leaderboardState) {
-                is LeaderboardUiState.Loading -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+            is LeaderboardUiState.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        (leaderboardState as LeaderboardUiState.Error).message,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
-                is LeaderboardUiState.Error -> {
+            }
+            else -> {
+                if (users.isEmpty() && topRatedPintxos.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -140,35 +127,45 @@ fun LeaderboardScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            (leaderboardState as LeaderboardUiState.Error).message,
-                            color = MaterialTheme.colorScheme.error
+                            "Aún no hay datos suficientes para el ranking",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-                else -> {
-                    if (users.isEmpty() && topRatedPintxos.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(padding),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "Aún no hay datos suficientes para el ranking",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
+                } else {
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                    ) {
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(padding),
-                            contentPadding = PaddingValues(bottom = 24.dp),
-                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                                .align(Alignment.TopCenter),
+                            contentPadding = PaddingValues(
+                                start = 20.dp,
+                                end = 20.dp,
+                                top = 8.dp,
+                                bottom = 32.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Podium hero card
+                            // Podium card
                             item {
-                                PodiumHeroCard(users = users.take(3))
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .widthIn(max = 760.dp),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                                    ),
+                                    shadowElevation = 1.dp
+                                ) {
+                                    PodiumHeroCard(users = users.take(3))
+                                }
                             }
 
                             // Users full list
@@ -176,26 +173,33 @@ fun LeaderboardScreen(
                                 item {
                                     SectionLabel(
                                         title = "Clasificación completa",
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .widthIn(max = 760.dp)
+                                            .padding(top = 6.dp, bottom = 2.dp)
                                     )
                                 }
                                 itemsIndexed(users.drop(3)) { i, user ->
-                                    val realIndex = i + 3
                                     UserRankingRow(
-                                        index = realIndex,
+                                        index = i + 3,
                                         user = user,
                                         progress = user.totalUploads.toFloat() / topCount,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .widthIn(max = 760.dp)
                                     )
                                 }
                             }
 
-                            // Pintxos section
+                            // Pintxos section header
                             item {
                                 SectionLabel(
                                     title = "Pintxos mejor valorados",
                                     subtitle = "Ordenados por nota media · empates por nº reseñas",
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .widthIn(max = 760.dp)
+                                        .padding(top = 6.dp, bottom = 2.dp)
                                 )
                             }
 
@@ -204,7 +208,8 @@ fun LeaderboardScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 24.dp),
+                                            .widthIn(max = 760.dp)
+                                            .padding(vertical = 24.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
@@ -218,7 +223,9 @@ fun LeaderboardScreen(
                                     PintxoRankingRow(
                                         index = index,
                                         pintxo = pintxo,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .widthIn(max = 760.dp)
                                     )
                                 }
                             }
@@ -227,11 +234,6 @@ fun LeaderboardScreen(
                 }
             }
         }
-
-        AppSnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
     }
 }
 
@@ -244,8 +246,8 @@ private fun SectionLabel(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             text = title,
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
         if (subtitle != null) {
@@ -268,60 +270,49 @@ private fun PodiumHeroCard(users: List<LeaderboardUser>) {
     val second = users.getOrNull(1)
     val third  = users.getOrNull(2)
 
-    Box(
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                        MaterialTheme.colorScheme.surface
-                    )
-                )
-            )
-            .padding(top = 20.dp, bottom = 28.dp, start = 16.dp, end = 16.dp)
+            .padding(top = 24.dp, bottom = 28.dp, start = 16.dp, end = 16.dp)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.fillMaxWidth()
+        Text(
+            text = "TOP PINTXEROS",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelSmall,
+            letterSpacing = 2.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = "Ranking semanal",
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Bottom
         ) {
-            Text(
-                text = "RANKING SEMANAL",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 11.sp,
-                letterSpacing = 2.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Text(
-                text = "Top Pintxeros",
-                fontWeight = FontWeight.Black,
-                fontSize = 24.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            if (second != null) {
+                PodiumSlot(user = second, position = 2, medalColor = silverColor, avatarSize = 68.dp)
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            if (first != null) {
+                PodiumSlot(user = first, position = 1, medalColor = goldColor, avatarSize = 86.dp, isCrown = true)
+            }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                if (second != null) {
-                    PodiumSlot(user = second, position = 2, medalColor = silverColor, avatarSize = 70.dp)
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-
-                if (first != null) {
-                    PodiumSlot(user = first, position = 1, medalColor = goldColor, avatarSize = 88.dp, isCrown = true)
-                }
-
-                if (third != null) {
-                    PodiumSlot(user = third, position = 3, medalColor = bronzeColor, avatarSize = 62.dp)
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+            if (third != null) {
+                PodiumSlot(user = third, position = 3, medalColor = bronzeColor, avatarSize = 60.dp)
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
     }
@@ -341,45 +332,49 @@ private fun PodiumSlot(
         verticalArrangement = Arrangement.Bottom
     ) {
         if (isCrown) {
-            Text(text = "\uD83D\uDC51", fontSize = 22.sp, modifier = Modifier.padding(bottom = 2.dp))
+            Text(text = "\uD83D\uDC51", fontSize = 20.sp, modifier = Modifier.padding(bottom = 4.dp))
         } else {
-            Text(
-                text = "$position",
-                fontWeight = FontWeight.Black,
-                fontSize = 17.sp,
-                color = medalColor,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
+            Surface(
+                modifier = Modifier.padding(bottom = 6.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = medalColor.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, medalColor.copy(alpha = 0.4f))
+            ) {
+                Text(
+                    text = "$position",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = medalColor
+                )
+            }
         }
 
-        Box(contentAlignment = Alignment.BottomEnd) {
-            if (user.profileImageUrl.isNotBlank()) {
-                AsyncImage(
-                    model = user.profileImageUrl,
-                    contentDescription = user.displayName,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(avatarSize)
-                        .clip(CircleShape)
-                        .border(3.dp, medalColor, CircleShape)
-                )
-            } else {
-                Surface(
-                    modifier = Modifier
-                        .size(avatarSize)
-                        .border(3.dp, medalColor, CircleShape),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shadowElevation = 2.dp
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(avatarSize * 0.5f),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+        if (user.profileImageUrl.isNotBlank()) {
+            AsyncImage(
+                model = user.profileImageUrl,
+                contentDescription = user.displayName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(avatarSize)
+                    .clip(CircleShape)
+                    .border(3.dp, medalColor, CircleShape)
+            )
+        } else {
+            Surface(
+                modifier = Modifier
+                    .size(avatarSize)
+                    .border(3.dp, medalColor, CircleShape),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(avatarSize * 0.5f),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -388,8 +383,8 @@ private fun PodiumSlot(
 
         Text(
             text = user.displayName.replaceFirstChar { it.uppercase() },
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
@@ -398,7 +393,7 @@ private fun PodiumSlot(
             text = "${user.totalUploads} pintxos",
             style = MaterialTheme.typography.labelSmall,
             color = if (position == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (position == 1) FontWeight.Bold else FontWeight.Normal,
+            fontWeight = if (position == 1) FontWeight.SemiBold else FontWeight.Normal,
             textAlign = TextAlign.Center
         )
     }
@@ -411,12 +406,14 @@ private fun UserRankingRow(
     progress: Float,
     modifier: Modifier = Modifier
 ) {
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(2.dp, RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f)),
+        shadowElevation = 1.dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -430,8 +427,8 @@ private fun UserRankingRow(
                 Text(
                     text = "#${index + 1}",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colorOnSurfaceVariant,
                     modifier = Modifier.width(34.dp),
                     textAlign = TextAlign.Center
                 )
@@ -442,23 +439,25 @@ private fun UserRankingRow(
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
                     )
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                        contentAlignment = Alignment.Center
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
-                        Text(
-                            text = user.displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = user.displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colorOnSurfaceVariant
+                            )
+                        }
                     }
                 }
 
@@ -466,26 +465,27 @@ private fun UserRankingRow(
                     Text(
                         text = user.displayName.replaceFirstChar { it.uppercase() },
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
+                        style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = if (user.totalUploads == 1) "1 pintxo" else "${user.totalUploads} pintxos",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = colorOnSurfaceVariant
                     )
                 }
 
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                 ) {
                     Text(
                         text = "${user.totalUploads}",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        fontWeight = FontWeight.Black,
-                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
@@ -497,8 +497,8 @@ private fun UserRankingRow(
                     .fillMaxWidth()
                     .height(5.dp)
                     .clip(RoundedCornerShape(50)),
-                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                color = MaterialTheme.colorScheme.secondary,
+                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                 strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
             )
         }
@@ -511,20 +511,28 @@ private fun PintxoRankingRow(
     pintxo: LeaderboardPintxo,
     modifier: Modifier = Modifier
 ) {
+    val goldColor   = Color(0xFFFFD700)
+    val silverColor = Color(0xFFB0BEC5)
+    val bronzeColor = Color(0xFFCD7F32)
+
     val medalColor = when (index) {
-        0 -> Color(0xFFFFD700)
-        1 -> Color(0xFFB0BEC5)
-        2 -> Color(0xFFCD7F32)
+        0 -> goldColor
+        1 -> silverColor
+        2 -> bronzeColor
         else -> MaterialTheme.colorScheme.outlineVariant
     }
     val isTopThree = index < 3
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(if (isTopThree) 4.dp else 2.dp, RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        color = if (isTopThree) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            1.dp,
+            if (isTopThree) medalColor.copy(alpha = 0.35f) else colorOnSurfaceVariant.copy(alpha = 0.12f)
+        ),
+        shadowElevation = if (isTopThree) 2.dp else 1.dp
     ) {
         Row(
             modifier = Modifier
@@ -533,28 +541,27 @@ private fun PintxoRankingRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        if (isTopThree) medalColor else MaterialTheme.colorScheme.surfaceVariant,
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier.size(36.dp),
+                shape = CircleShape,
+                color = if (isTopThree) medalColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = if (isTopThree) BorderStroke(1.5.dp, medalColor.copy(alpha = 0.5f)) else null
             ) {
-                Text(
-                    text = if (isTopThree) "${index + 1}" else "#${index + 1}",
-                    fontWeight = FontWeight.Black,
-                    fontSize = if (isTopThree) 14.sp else 11.sp,
-                    color = if (isTopThree) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "${index + 1}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = if (isTopThree) 14.sp else 12.sp,
+                        color = if (isTopThree) medalColor else colorOnSurfaceVariant
+                    )
+                }
             }
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = pintxo.name,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
@@ -562,7 +569,7 @@ private fun PintxoRankingRow(
                 Text(
                     text = pintxo.barName,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = colorOnSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -575,9 +582,9 @@ private fun PintxoRankingRow(
                 ) {
                     Text(
                         text = String.format(java.util.Locale.US, "%.1f", pintxo.averageRating),
-                        fontWeight = FontWeight.Black,
-                        fontSize = 16.sp,
-                        color = if (isTopThree) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Icon(
                         imageVector = Icons.Default.Star,
@@ -589,7 +596,7 @@ private fun PintxoRankingRow(
                 Text(
                     text = if (pintxo.ratingCount == 1) "1 voto" else "${pintxo.ratingCount} votos",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = colorOnSurfaceVariant
                 )
             }
         }
