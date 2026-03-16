@@ -137,6 +137,8 @@ fun LeaderboardScreen(
                             .fillMaxSize()
                             .padding(padding)
                     ) {
+                        val maxCardWidth = maxWidth.coerceAtMost(760.dp)
+
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -155,7 +157,7 @@ fun LeaderboardScreen(
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .widthIn(max = 760.dp),
+                                        .widthIn(max = maxCardWidth),
                                     shape = RoundedCornerShape(24.dp),
                                     color = MaterialTheme.colorScheme.surface,
                                     border = BorderStroke(
@@ -175,7 +177,7 @@ fun LeaderboardScreen(
                                         title = "Clasificación completa",
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .widthIn(max = 760.dp)
+                                            .widthIn(max = maxCardWidth)
                                             .padding(top = 6.dp, bottom = 2.dp)
                                     )
                                 }
@@ -186,7 +188,7 @@ fun LeaderboardScreen(
                                         progress = user.totalUploads.toFloat() / topCount,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .widthIn(max = 760.dp)
+                                            .widthIn(max = maxCardWidth)
                                     )
                                 }
                             }
@@ -198,7 +200,7 @@ fun LeaderboardScreen(
                                     subtitle = "Ordenados por nota media · empates por nº reseñas",
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .widthIn(max = 760.dp)
+                                        .widthIn(max = maxCardWidth)
                                         .padding(top = 6.dp, bottom = 2.dp)
                                 )
                             }
@@ -208,7 +210,7 @@ fun LeaderboardScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .widthIn(max = 760.dp)
+                                            .widthIn(max = maxCardWidth)
                                             .padding(vertical = 24.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -225,7 +227,7 @@ fun LeaderboardScreen(
                                         pintxo = pintxo,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .widthIn(max = 760.dp)
+                                            .widthIn(max = maxCardWidth)
                                     )
                                 }
                             }
