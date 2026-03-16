@@ -219,3 +219,63 @@ Invoke-RestMethod -Method Get -Uri "http://localhost:8080/health"
 ```
 
 Then rebuild the app in Android Studio and run normally.
+
+---
+
+## Commands For Physical Phone
+
+Use one of these two modes.
+
+### Mode A: Phone connected by USB (recommended)
+
+Keep the app configured with:
+- `LOCAL_IMAGE_BASE_URL = "http://localhost:8080"`
+
+Run:
+
+```bash
+# 1) Start Docker image server
+docker compose -f docker-compose.image-server.yml up -d
+
+# 2) Check server health on host
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/health"
+
+# 3) Verify phone is detected
+adb devices
+
+# 4) Tunnel phone localhost:8080 -> PC localhost:8080
+adb reverse tcp:8080 tcp:8080
+
+# 5) Confirm reverse tunnel
+adb reverse --list
+```
+
+If the phone reconnects/restarts, run steps 3-5 again.
+
+### Mode B: Phone on same Wi-Fi (without USB)
+
+In this mode there is no `adb reverse`, so the app must use your PC LAN IP.
+
+1) Get your PC IPv4:
+
+```powershell
+ipconfig
+```
+
+2) Update these values to your LAN IP (example `192.168.1.50`):
+- `app/build.gradle.kts` -> `LOCAL_IMAGE_BASE_URL = "http://192.168.1.50:8080"`
+- `docker-compose.image-server.yml` -> `PUBLIC_BASE_URL: http://192.168.1.50:8080`
+
+3) Restart container:
+
+```bash
+docker compose -f docker-compose.image-server.yml up -d
+```
+
+4) Ensure Windows Firewall allows TCP 8080:
+
+```powershell
+New-NetFirewallRule -DisplayName "PintxoMatch Image Server (8080)" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Any
+```
+
+Note: for LAN mode, add your LAN IP in `app/src/main/res/xml/network_security_config.xml` as an allowed `<domain>` if Android blocks cleartext HTTP.
