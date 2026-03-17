@@ -8,7 +8,7 @@ services:
     environment:
       PORT: 8080
       STORAGE_ROOT: /data
-      PUBLIC_BASE_URL: https://paperback-valium-reliable-territories.trycloudflare.com
+      PUBLIC_BASE_URL: https://ripe-ideas-despite-vendor.trycloudflare.com
       IMAGE_SERVER_API_KEY: pintxomatch-local-dev-key
     volumes:
       - ./docker/image-server/data:/data
