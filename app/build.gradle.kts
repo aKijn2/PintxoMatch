@@ -21,7 +21,7 @@ android {
         // Image storage backend selector: "cloudinary" or "local".
         buildConfigField("String", "IMAGE_PROVIDER", "\"local\"")
         // Cloudflare tunnel base URL for local image server access from physical devices.
-        buildConfigField("String", "LOCAL_IMAGE_BASE_URL", "\"https://ripe-ideas-despite-vendor.trycloudflare.com\"")
+        buildConfigField("String", "LOCAL_IMAGE_BASE_URL", "\"https://preserve-immigrants-cakes-york.trycloudflare.com\"")
         buildConfigField("String", "LOCAL_IMAGE_API_KEY", "\"pintxomatch-local-dev-key\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
