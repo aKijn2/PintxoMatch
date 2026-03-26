@@ -1,39 +1,39 @@
-# Food View X (PintxoMatch) 🥘
+# Food View X (PintxoMatch)
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/Jetpack_Compose-Latest-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
 [![Firebase](https://img.shields.io/badge/Firebase-Full_Stack-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
 [![Material 3](https://img.shields.io/badge/Material_3-Modern-757575?style=for-the-badge&logo=materialdesign&logoColor=white)](https://m3.material.io/)
 
-**Food View X** is a premium Android application designed for pintxo enthusiasts. Discover, rate, and share the best culinary treasures of Gipuzkoa through a modern, swipe-based interface and a gamified community experience.
+**Food View X** is a Android application designed for food enthusiasts. Discover, rate, and share the best culinary treasures from the planet through a modern, swipe-based interface and a gamified community experience.
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-### 🍱 Swipe-to-Match Discovery
+### Swipe-to-Match Discovery
 Browse a curated feed of pintxos with smooth, fluid animations. Swipe right to "Match" (Save/Favorite) or left to "Pass". Discover your next meal in a fun, intuitive way.
 
-### 🏆 Gamified Community Profile
+### Gamified Community Profile
 Your profile is more than just settings. Inspired by premium gaming platforms, it features:
 - **Pintxo XP & Levels:** Earn experience points for every contribution.
 - **Achievement Showcase:** Unlock unique badges like "Crítico", "Estrella", or "Leyenda" as you explore.
 - **Dynamic Headers:** Beautiful, blurred banners that reflect your personality.
 
-### 🗺️ Nearby Exploration
+### Nearby Exploration
 Integrated map experience powered by **OSM** and **Google Maps Routing**.
 - Find bars and pintxos around your current location.
 - Category filters to find exactly what you're craving.
 - One-tap route handoff to get you there fast.
 
-### 💬 Community & Support
+### Community & Support
 - **Reviews:** Share your thoughts and photos of every bite. Editable, verified reviews ensure quality.
 - **Real-time Support:** Dedicated chat thread with admins for seamless assistance and feedback.
 - **Leaderboards:** See who the top contributors are in the community.
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Category | Technology |
 | :--- | :--- |
@@ -45,7 +45,7 @@ Integrated map experience powered by **OSM** and **Google Maps Routing**.
 
 ---
 
-## 📱 Interface Preview
+## Interface Preview
 
 <p align="center">
   <img src="img/home.jpeg" alt="PintxoMatch screen 1" width="220" />
@@ -55,7 +55,7 @@ Integrated map experience powered by **OSM** and **Google Maps Routing**.
 
 ---
 
-## 🛠️ Local Setup
+## Local Setup
 
 ### Prerequisites
 - **Android Studio** (Hedgehog or newer recommended)
@@ -108,7 +108,7 @@ buildConfigField("String", "IMAGE_PROVIDER", "\"cloudinary\"")
 
 ---
 
-## 📊 Data Model (Simplified)
+## Data Model (Simplified)
 
 ### Firestore `Pintxos`
 ```json
@@ -137,9 +137,10 @@ buildConfigField("String", "IMAGE_PROVIDER", "\"cloudinary\"")
 
 ---
 
-## 📜 License & Notes
+## License & Notes
 - This project is part of a culinary exploration initiative.
 - **Light Theme Only:** The UI is currently optimized for Light Theme to ensure visual consistency in high-contrast environments.
 
 ---
-*Developed with ❤️ for the pintxo community. Bon Profit!* 🥂
+
+*Developed with ❤️ for the food community. Bon Profit!*
