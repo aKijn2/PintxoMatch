@@ -21,10 +21,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.ui.viewmodel.UserPintxosUiState
 import com.example.pintxomatch.ui.viewmodel.UserPintxosViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,7 +38,6 @@ fun UserPintxosScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var alertMessage by remember { mutableStateOf<String?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
     val colorBackground = MaterialTheme.colorScheme.background
     val colorPrimary = MaterialTheme.colorScheme.primary
@@ -48,32 +48,30 @@ fun UserPintxosScreen(
     }
 
     LaunchedEffect(alertMessage) {
-        alertMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (alertMessage != null) {
+            delay(3000)
             alertMessage = null
         }
     }
 
-    Scaffold(
-        containerColor = colorBackground,
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Mis Pintxos", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = colorBackground
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = colorBackground,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Mis Pintxos", fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = colorBackground
+                    )
                 )
-            )
-        },
-        snackbarHost = {
-            AppSnackbarHost(hostState = snackbarHostState)
-        }
-    ) { innerPadding ->
-        when (val state = uiState) {
+            }
+        ) { innerPadding ->
+            when (val state = uiState) {
             is UserPintxosUiState.Loading -> {
                 Box(
                     modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -240,6 +238,13 @@ fun UserPintxosScreen(
                     }
                 }
             }
+            }
         }
+
+        ModernTopToast(
+            message = alertMessage,
+            onDismiss = { alertMessage = null },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }

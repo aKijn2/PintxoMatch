@@ -27,10 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.data.repository.AuthRepository
 import com.example.pintxomatch.data.repository.ImageRepository
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import androidx.compose.ui.graphics.Color
@@ -62,7 +63,6 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     var isUploading by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
     val pickMediaLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -110,8 +110,8 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
     }
 
     LaunchedEffect(alertMessage) {
-        alertMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (alertMessage != null) {
+            delay(3000)
             alertMessage = null
         }
     }
@@ -177,10 +177,11 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
         }
     }
 
-    Scaffold(
-        containerColor = colorBackground,
-        topBar = {
-            CenterAlignedTopAppBar(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = colorBackground,
+            topBar = {
+                CenterAlignedTopAppBar(
                 title = {
                     Text(
                         text = "Subir pintxo",
@@ -222,31 +223,28 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = colorBackground
                 )
-            )
-        },
-        snackbarHost = {
-            AppSnackbarHost(hostState = snackbarHostState)
-        }
-    ) { paddingValues ->
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            val isTablet = maxWidth > 700.dp
-
-            Column(
+                )
+            }
+        ) { paddingValues ->
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(paddingValues)
             ) {
+                val isTablet = maxWidth > 700.dp
+
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = if (isTablet) 760.dp else 600.dp)
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = if (isTablet) 760.dp else 600.dp)
+                    ) {
                     Spacer(modifier = Modifier.height(18.dp))
 
                     UploadImagePanel(imageUri = pickedImageUri)
@@ -332,9 +330,16 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
                     }
 
                     Spacer(modifier = Modifier.height(28.dp))
+                    }
                 }
             }
         }
+
+        ModernTopToast(
+            message = alertMessage,
+            onDismiss = { alertMessage = null },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 

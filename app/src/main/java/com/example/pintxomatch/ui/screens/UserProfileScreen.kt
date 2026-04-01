@@ -29,11 +29,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.data.repository.ImageRepository
 import com.example.pintxomatch.data.repository.AuthRepository
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import androidx.compose.ui.graphics.Brush
@@ -78,7 +79,6 @@ fun UserProfileScreen(
     var isSavingProfile by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
     // Estados adicionales para perfil publico
     var publicProfile by remember { mutableStateOf<com.example.pintxomatch.data.model.LeaderboardUser?>(null) }
@@ -90,8 +90,8 @@ fun UserProfileScreen(
     var commentsEnabled by remember { mutableStateOf(true) }
 
     LaunchedEffect(alertMessage) {
-        alertMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (alertMessage != null) {
+            delay(3000)
             alertMessage = null
         }
     }
@@ -497,8 +497,9 @@ fun UserProfileScreen(
             }
         }
 
-    AppSnackbarHost(
-        hostState = snackbarHostState,
+    ModernTopToast(
+        message = alertMessage,
+        onDismiss = { alertMessage = null },
         modifier = Modifier.align(Alignment.TopCenter)
     )
     } // closes Box

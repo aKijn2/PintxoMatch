@@ -38,7 +38,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,7 +62,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import com.example.pintxomatch.data.model.Pintxo
 import com.example.pintxomatch.data.repository.ImageRepository
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -77,6 +76,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import kotlin.random.Random
 import androidx.compose.animation.core.Animatable
 import com.example.pintxomatch.ui.viewmodel.SupportTicketDraftStore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private data class HomeRatingUpdate(
@@ -109,7 +109,6 @@ fun HomeReviewScreen(
     var showSupportTicketDialog by remember { mutableStateOf(false) }
     var supportTicketTitle by remember { mutableStateOf("") }
     var checkingSupportTicket by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val chatRepository = remember { ChatRepository() }
     val userPhotoUrl = remember {
@@ -291,8 +290,8 @@ fun HomeReviewScreen(
     }
 
     LaunchedEffect(alertMessage) {
-        alertMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (alertMessage != null) {
+            delay(3000)
             alertMessage = null
         }
     }
@@ -581,8 +580,9 @@ fun HomeReviewScreen(
             }
         }
 
-        AppSnackbarHost(
-            hostState = snackbarHostState,
+        ModernTopToast(
+            message = alertMessage,
+            onDismiss = { alertMessage = null },
             modifier = Modifier.align(Alignment.TopCenter)
         )
 

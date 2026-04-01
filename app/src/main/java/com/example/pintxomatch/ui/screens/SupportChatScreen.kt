@@ -46,7 +46,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -70,9 +69,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.ui.viewmodel.SupportChatUiState
 import com.example.pintxomatch.ui.viewmodel.SupportChatViewModel
+import kotlinx.coroutines.delay
 
 class SupportChatViewModelFactory(private val threadId: String?) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -99,8 +99,7 @@ fun SupportChatScreen(
     var showDeleteTicketDialog by remember { mutableStateOf(false) }
     var messageToDeleteId by remember { mutableStateOf<String?>(null) }
     var revealedDeleteMessageId by remember { mutableStateOf<String?>(null) }
-    
-    val snackbarHostState = remember { SnackbarHostState() }
+
     val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
@@ -108,8 +107,8 @@ fun SupportChatScreen(
     }
 
     LaunchedEffect(errorMessage) {
-        errorMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (errorMessage != null) {
+            delay(3000)
             errorMessage = null
         }
     }
@@ -133,10 +132,11 @@ fun SupportChatScreen(
         "open"
     }
 
-    Scaffold(
-        containerColor = colorBackground,
-        topBar = {
-            CenterAlignedTopAppBar(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = colorBackground,
+            topBar = {
+                CenterAlignedTopAppBar(
                 title = {
                     Text(
                         text = if (isCompactPhone) "Soporte" else "Soporte en vivo",
@@ -176,16 +176,15 @@ fun SupportChatScreen(
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = colorBackground
                 )
-            )
-        },
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) }
-    ) { paddingValues ->
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            when (val state = uiState) {
+                )
+            }
+        ) { paddingValues ->
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                when (val state = uiState) {
                 is SupportChatUiState.Loading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
@@ -423,6 +422,12 @@ fun SupportChatScreen(
             }
         }
 
+        ModernTopToast(
+            message = errorMessage,
+            onDismiss = { errorMessage = null },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+
         if (showDeleteTicketDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteTicketDialog = false },
@@ -468,4 +473,5 @@ fun SupportChatScreen(
             )
         }
     }
+}
 }

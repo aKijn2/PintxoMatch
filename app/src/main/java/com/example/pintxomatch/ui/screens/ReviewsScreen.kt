@@ -43,7 +43,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -64,10 +63,11 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.pintxomatch.data.repository.ImageRepository
+import kotlinx.coroutines.delay
 
 data class ReviewItem(
     val id: String,
@@ -106,7 +106,6 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
     fun loadData() {
         isLoading = true
@@ -262,8 +261,8 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     LaunchedEffect(Unit) { loadData() }
 
     LaunchedEffect(alertMessage) {
-        alertMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (alertMessage != null) {
+            delay(3000)
             alertMessage = null
         }
     }
@@ -272,40 +271,40 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     val colorPrimary = MaterialTheme.colorScheme.primary
     val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
-    Scaffold(
-        containerColor = colorBackground,
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Reseñas", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = colorBackground
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = colorBackground,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Reseñas", fontWeight = FontWeight.SemiBold) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = colorBackground
+                    )
                 )
-            )
-        },
-        snackbarHost = { AppSnackbarHost(hostState = snackbarHostState) }
-    ) { paddingValues ->
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
-        } else {
-            BoxWithConstraints(
-                modifier = Modifier.fillMaxSize().padding(paddingValues)
-            ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().align(Alignment.TopCenter),
-                    contentPadding = PaddingValues(
-                        start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            }
+        ) { paddingValues ->
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator() }
+            } else {
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxSize().padding(paddingValues)
                 ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().align(Alignment.TopCenter),
+                        contentPadding = PaddingValues(
+                            start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                     // ── Write review card ──────────────────────────────────
                     item {
                         Surface(
@@ -552,9 +551,16 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                             )
                         }
                     }
+                    }
                 }
             }
         }
+
+        ModernTopToast(
+            message = alertMessage,
+            onDismiss = { alertMessage = null },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 

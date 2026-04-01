@@ -28,10 +28,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.data.repository.AuthRepository
 import com.example.pintxomatch.data.repository.PintxoRepository
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -61,7 +62,6 @@ fun EditPintxoScreen(
     var isDeleting by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(pintxoId) {
         if (currentUser == null) {
@@ -137,8 +137,8 @@ fun EditPintxoScreen(
     }
 
     LaunchedEffect(alertMessage) {
-        alertMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (alertMessage != null) {
+            delay(3000)
             alertMessage = null
         }
     }
@@ -295,8 +295,9 @@ fun EditPintxoScreen(
                 }
             }
         }
-        AppSnackbarHost(
-            hostState = snackbarHostState,
+        ModernTopToast(
+            message = alertMessage,
+            onDismiss = { alertMessage = null },
             modifier = Modifier.align(Alignment.TopCenter)
         )
     }

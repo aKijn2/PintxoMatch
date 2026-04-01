@@ -28,7 +28,7 @@ import androidx.core.view.WindowCompat
 import com.example.pintxomatch.data.model.Pintxo
 import com.example.pintxomatch.data.repository.ImageRepository
 import com.example.pintxomatch.navigation.AppNavigation
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.example.pintxomatch.ui.theme.PintxoMatchTheme
 import com.google.firebase.auth.FirebaseAuth
@@ -89,7 +89,6 @@ fun MainSwipeScreen(
     var waitingPintxoId by remember { mutableStateOf<String?>(null) }
     var waitingSecondsLeft by remember { mutableStateOf(0) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
     val firestore = FirebaseFirestore.getInstance()
 
     fun notify(message: String) {
@@ -209,8 +208,8 @@ fun MainSwipeScreen(
     }
 
     LaunchedEffect(alertMessage) {
-        alertMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (alertMessage != null) {
+            delay(3000)
             alertMessage = null
         }
     }
@@ -643,8 +642,9 @@ fun MainSwipeScreen(
             
         }
     }
-    AppSnackbarHost(
-        hostState = snackbarHostState,
+    ModernTopToast(
+        message = alertMessage,
+        onDismiss = { alertMessage = null },
         modifier = Modifier.align(Alignment.TopCenter)
     )
     } // end outer Box

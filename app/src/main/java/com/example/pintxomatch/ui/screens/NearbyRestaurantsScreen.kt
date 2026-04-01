@@ -45,7 +45,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -76,7 +75,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import androidx.core.os.CancellationSignal
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
@@ -144,7 +144,6 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
     val locationManager = remember {
         context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     }
-    val snackbarHostState = remember { SnackbarHostState() }
     val nearbyResultsCache = remember { mutableMapOf<String, List<NearbyRestaurant>>() }
 
     var selectedRadius by remember { mutableIntStateOf(1000) }
@@ -199,7 +198,7 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
                 alertMessage = null
                 return@let
             }
-            snackbarHostState.showSnackbar(it)
+            delay(3000)
             alertMessage = null
         }
     }
@@ -431,8 +430,9 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
                 }
             }
 
-            AppSnackbarHost(
-                hostState = snackbarHostState,
+            ModernTopToast(
+                message = alertMessage,
+                onDismiss = { alertMessage = null },
                 modifier = Modifier.align(Alignment.TopCenter)
             )
         }

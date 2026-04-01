@@ -27,11 +27,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.pintxomatch.data.repository.AuthRepository
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.ui.viewmodel.SingleChatUiState
 import com.example.pintxomatch.ui.viewmodel.SingleChatViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import kotlinx.coroutines.delay
 
 class SingleChatViewModelFactory(private val chatId: String) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -61,7 +62,6 @@ fun ChatScreen(
     var profileDialogPhoto by remember { mutableStateOf<String?>(null) }
     
     val listState = rememberLazyListState()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     fun exitChatOnce() {
         if (hasExited) return
@@ -91,8 +91,8 @@ fun ChatScreen(
     }
 
     LaunchedEffect(errorMessage) {
-        errorMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (errorMessage != null) {
+            delay(3000)
             errorMessage = null
         }
     }
@@ -225,7 +225,11 @@ fun ChatScreen(
                 }
             }
         }
-        AppSnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.TopCenter))
+        ModernTopToast(
+            message = errorMessage,
+            onDismiss = { errorMessage = null },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 
     if (showProfileDialog) {

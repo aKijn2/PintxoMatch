@@ -18,8 +18,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.pintxomatch.ui.components.AppSnackbarHost
+import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.data.repository.AuthRepository
+import kotlinx.coroutines.delay
 
 private enum class PasswordResetStep {
     RequestEmail,
@@ -62,11 +63,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var showResetNewPassword by remember { mutableStateOf(false) }
     var showResetConfirmPassword by remember { mutableStateOf(false) }
     var isResetLoading by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(alertMessage) {
-        alertMessage?.let {
-            snackbarHostState.showSnackbar(it)
+        if (alertMessage != null) {
+            delay(3000)
             alertMessage = null
         }
     }
@@ -416,8 +416,9 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
         }
     }
-    AppSnackbarHost(
-        hostState = snackbarHostState,
+    ModernTopToast(
+        message = alertMessage,
+        onDismiss = { alertMessage = null },
         modifier = Modifier.align(Alignment.TopCenter)
     )
     } // end outer Box
