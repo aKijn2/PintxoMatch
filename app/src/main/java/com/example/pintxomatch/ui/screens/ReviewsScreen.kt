@@ -139,15 +139,35 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     .orderBy("createdAt")
                     .get()
                     .addOnSuccessListener { reviewDocs ->
+                        val currentUserPhotoUrl = ImageRepository
+                            .normalizeImageUrlForCurrentProvider(auth.currentUser?.photoUrl?.toString())
+                            .orEmpty()
+
                         reviews = reviewDocs.documents.mapNotNull { doc ->
                             val stars = doc.getLong("stars")?.toInt() ?: return@mapNotNull null
+                            val userUidFromDoc = doc.getString("userUid") ?: ""
+                            val storedPhotoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(
+                                doc.getString("photoUrl")
+                            ).orEmpty()
+
+                            val resolvedPhotoUrl = if (userUidFromDoc == uid && currentUserPhotoUrl.isNotBlank()) {
+                                currentUserPhotoUrl
+                            } else {
+                                storedPhotoUrl
+                            }
+
+                            if (userUidFromDoc == uid && resolvedPhotoUrl.isNotBlank() && resolvedPhotoUrl != storedPhotoUrl) {
+                                firestore.collection("Reviews").document(doc.id)
+                                    .update("photoUrl", resolvedPhotoUrl)
+                            }
+
                             ReviewItem(
                                 id = doc.id,
                                 pintxoId = doc.getString("pintxoId") ?: "",
-                                userUid = doc.getString("userUid") ?: "",
+                                userUid = userUidFromDoc,
                                 pintxoName = doc.getString("pintxoName") ?: "Pintxo",
                                 userName = doc.getString("userName") ?: "Usuario",
-                                photoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(doc.getString("photoUrl")) ?: "",
+                                photoUrl = resolvedPhotoUrl,
                                 stars = stars.coerceIn(1, 5),
                                 text = doc.getString("text") ?: "",
                                 createdAt = doc.getLong("createdAt") ?: 0L
