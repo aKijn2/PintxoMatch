@@ -2,6 +2,7 @@ package com.example.pintxomatch.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -12,17 +13,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -40,8 +49,12 @@ fun GamificationProfileSection(
     levelProgress: Float,
     currentStreak: Int,
     badges: List<String>,
+    onDebugReplayBadge: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val surfaceRed = Color(0xFFD32F2F)
+    var internalDebugBadge by remember { mutableStateOf<String?>(null) }
+
     val animatedProgress = animateFloatAsState(
         targetValue = levelProgress.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 700),
@@ -53,8 +66,8 @@ fun GamificationProfileSection(
             .fillMaxWidth()
             .testTag("gamification_profile_section"),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF101012)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        colors = CardDefaults.cardColors(containerColor = surfaceRed),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f))
     ) {
         Column(
             modifier = Modifier
@@ -83,6 +96,13 @@ fun GamificationProfileSection(
                 }
 
                 Row(
+                    modifier = Modifier.clickable {
+                        if (onDebugReplayBadge != null) {
+                            onDebugReplayBadge()
+                        } else {
+                            internalDebugBadge = "badge_debug_critic"
+                        }
+                    },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -90,7 +110,7 @@ fun GamificationProfileSection(
                     Text(
                         text = "$currentStreak dias",
                         modifier = Modifier.testTag("gamification_streak_text"),
-                        color = Color(0xFFFF7043),
+                        color = Color.White,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -101,22 +121,22 @@ fun GamificationProfileSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp),
-                color = Color(0xFFFF2D55),
-                trackColor = Color.White.copy(alpha = 0.12f)
+                color = Color.White,
+                trackColor = Color.White.copy(alpha = 0.3f)
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "Badges desbloqueados",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.8f)
+                    color = Color.White
                 )
 
                 if (badges.isEmpty()) {
                     Text(
                         text = "Aun no tienes badges. Completa retos semanales.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.55f)
+                        color = Color.White.copy(alpha = 0.92f)
                     )
                 } else {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -127,6 +147,12 @@ fun GamificationProfileSection(
                 }
             }
         }
+
+        BadgeUnlockedPopup(
+            visible = !internalDebugBadge.isNullOrBlank(),
+            badgeId = internalDebugBadge.orEmpty(),
+            onDismiss = { internalDebugBadge = null }
+        )
     }
 }
 
@@ -135,19 +161,18 @@ fun WeeklyChallengeCard(
     challenge: WeeklyChallengeUiItem,
     modifier: Modifier = Modifier
 ) {
+    val surfaceRed = Color(0xFFD32F2F)
     val animatedProgress = animateFloatAsState(
         targetValue = challenge.progressFraction,
         animationSpec = tween(durationMillis = 850),
         label = "challenge_progress"
     )
 
-    val accent = if (challenge.isCompleted) Color(0xFF38D39F) else Color(0xFFFF2D55)
-
     Card(
         modifier = modifier.testTag("weekly_challenge_card_${challenge.id}"),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF151518)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.09f))
+        colors = CardDefaults.cardColors(containerColor = surfaceRed),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f))
     ) {
         Column(
             modifier = Modifier
@@ -172,8 +197,8 @@ fun WeeklyChallengeCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(7.dp),
-                color = accent,
-                trackColor = Color.White.copy(alpha = 0.12f)
+                color = Color.White,
+                trackColor = Color.White.copy(alpha = 0.35f)
             )
 
             Row(
@@ -189,7 +214,7 @@ fun WeeklyChallengeCard(
                 )
                 Text(
                     text = if (challenge.isCompleted) "Completado" else "Activo",
-                    color = accent,
+                    color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -204,19 +229,30 @@ private fun BadgePill(label: String) {
         modifier = Modifier
             .background(
                 brush = Brush.horizontalGradient(
-                    colors = listOf(Color(0xFFFF2D55), Color(0xFFFF9500))
+                    colors = listOf(Color(0xFFD32F2F), Color(0xFFB71C1C))
                 ),
                 shape = RoundedCornerShape(999.dp)
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(999.dp))
     ) {
-        Text(
-            text = label,
-            color = Color.White,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.EmojiEvents,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = label,
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
