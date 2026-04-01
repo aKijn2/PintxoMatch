@@ -1,9 +1,28 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
 }
+
+val localProperties = Properties().apply {
+    val localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        localPropsFile.inputStream().use { load(it) }
+    }
+}
+
+val localImageBaseUrl = localProperties.getProperty(
+    "LOCAL_IMAGE_BASE_URL",
+    "https://preserve-immigrants-cakes-york.trycloudflare.com"
+)
+
+val localImageApiKey = localProperties.getProperty(
+    "LOCAL_IMAGE_API_KEY",
+    "pintxomatch-local-dev-key"
+)
 
 android {
     namespace = "com.example.pintxomatch"
@@ -21,8 +40,8 @@ android {
         // Image storage backend selector: "cloudinary" or "local".
         buildConfigField("String", "IMAGE_PROVIDER", "\"local\"")
         // Cloudflare tunnel base URL for local image server access from physical devices.
-        buildConfigField("String", "LOCAL_IMAGE_BASE_URL", "\"https://preserve-immigrants-cakes-york.trycloudflare.com\"")
-        buildConfigField("String", "LOCAL_IMAGE_API_KEY", "\"pintxomatch-local-dev-key\"")
+        buildConfigField("String", "LOCAL_IMAGE_BASE_URL", "\"$localImageBaseUrl\"")
+        buildConfigField("String", "LOCAL_IMAGE_API_KEY", "\"$localImageApiKey\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

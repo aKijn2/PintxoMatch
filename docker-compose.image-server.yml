@@ -8,8 +8,8 @@ services:
     environment:
       PORT: 8080
       STORAGE_ROOT: /data
-      PUBLIC_BASE_URL: https://preserve-immigrants-cakes-york.trycloudflare.com
-      IMAGE_SERVER_API_KEY: pintxomatch-local-dev-key
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      IMAGE_SERVER_API_KEY: ${IMAGE_SERVER_API_KEY:-pintxomatch-local-dev-key}
     volumes:
       - ./docker/image-server/data:/data
     ports:

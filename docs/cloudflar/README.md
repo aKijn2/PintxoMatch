@@ -19,6 +19,24 @@ Install cloudflared on Windows (PowerShell):
 
   winget install Cloudflare.cloudflared
 
+## Fast start (recommended)
+
+From project root, run one command:
+
+  .\scripts\start-dev-cloudflare.ps1
+
+What this script does for you:
+
+- Starts Docker image server.
+- Starts cloudflared tunnel.
+- Detects the generated trycloudflare URL.
+- Updates LOCAL_IMAGE_BASE_URL in local.properties.
+- Recreates container with PUBLIC_BASE_URL set to same URL.
+
+After it finishes, rebuild and run the Android app.
+
+## Manual flow (fallback)
+
 ## Start your local image server
 
 From project root:
@@ -43,22 +61,22 @@ Keep this terminal open while testing.
 
 ## Configure the app with the tunnel URL
 
-1. Open app/build.gradle.kts
+1. Open local.properties
 2. Set LOCAL_IMAGE_BASE_URL to your HTTPS tunnel URL.
 
 Example:
 
-  buildConfigField("String", "LOCAL_IMAGE_BASE_URL", "\"https://random-name.trycloudflare.com\"")
+  LOCAL_IMAGE_BASE_URL=https://random-name.trycloudflare.com
 
 3. Rebuild the app.
 
 ## Configure server-generated image URLs
 
-Open docker-compose.image-server.yml and set PUBLIC_BASE_URL to the same HTTPS tunnel URL.
+Set environment variable PUBLIC_BASE_URL to the same HTTPS tunnel URL.
 
 Example:
 
-  PUBLIC_BASE_URL: https://random-name.trycloudflare.com
+  $env:PUBLIC_BASE_URL="https://random-name.trycloudflare.com"
 
 Then recreate container:
 
@@ -68,8 +86,8 @@ Then recreate container:
 
 - Temporary tunnel URL changes every time you restart cloudflared.
 - If URL changes, update both places again:
-  - app/build.gradle.kts (LOCAL_IMAGE_BASE_URL)
-  - docker-compose.image-server.yml (PUBLIC_BASE_URL)
+  - local.properties (LOCAL_IMAGE_BASE_URL)
+  - PUBLIC_BASE_URL environment variable for docker compose
 
 ## Stable tunnel URL (recommended later)
 

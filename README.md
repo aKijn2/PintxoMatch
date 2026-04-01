@@ -77,7 +77,15 @@ Integrated map experience powered by **OSM** and **Google Maps Routing**.
 
 The app currently uses a local Docker container for image hosting during development.
 
-**Every dev session, run these two commands:**
+**Fast dev session start (Cloudflare + image server):**
+
+```powershell
+.\scripts\start-dev-cloudflare.ps1
+```
+
+This command starts Docker + cloudflared, detects the tunnel URL, updates `LOCAL_IMAGE_BASE_URL` in `local.properties`, and recreates the image server with matching `PUBLIC_BASE_URL`.
+
+**Manual fallback (same as before):**
 
 ```bash
 # 1. Start the image server
