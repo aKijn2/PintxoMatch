@@ -39,3 +39,6 @@ Thumbs.db
 
 # --- Local Docker image server uploads (dev only, not for version control) ---
 docker/image-server/data/
+
+# --- AI customization privacy ---
+.github/
