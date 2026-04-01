@@ -1,15 +1,19 @@
 package com.example.pintxomatch.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,6 +32,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,11 +41,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pintxomatch.ui.viewmodel.WeeklyChallengeUiItem
+import kotlinx.coroutines.delay
 
 @Composable
 fun GamificationProfileSection(
@@ -49,11 +57,10 @@ fun GamificationProfileSection(
     levelProgress: Float,
     currentStreak: Int,
     badges: List<String>,
-    onDebugReplayBadge: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val surfaceRed = Color(0xFFD32F2F)
-    var internalDebugBadge by remember { mutableStateOf<String?>(null) }
+    var debugSequenceTrigger by remember { mutableStateOf(0) }
 
     val animatedProgress = animateFloatAsState(
         targetValue = levelProgress.coerceIn(0f, 1f),
@@ -97,11 +104,8 @@ fun GamificationProfileSection(
 
                 Row(
                     modifier = Modifier.clickable {
-                        if (onDebugReplayBadge != null) {
-                            onDebugReplayBadge()
-                        } else {
-                            internalDebugBadge = "badge_debug_critic"
-                        }
+                        // Temporary debug replay hook: tap streak icon row to inspect trophy sequence.
+                        debugSequenceTrigger += 1
                     },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -147,13 +151,12 @@ fun GamificationProfileSection(
                 }
             }
         }
-
-        BadgeUnlockedPopup(
-            visible = !internalDebugBadge.isNullOrBlank(),
-            badgeId = internalDebugBadge.orEmpty(),
-            onDismiss = { internalDebugBadge = null }
-        )
     }
+
+    DebugTrophySequenceOverlay(
+        trigger = debugSequenceTrigger,
+        modifier = Modifier.fillMaxSize()
+    )
 }
 
 @Composable
@@ -252,6 +255,89 @@ private fun BadgePill(label: String) {
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold
             )
+        }
+    }
+}
+
+@Composable
+private fun DebugTrophySequenceOverlay(
+    trigger: Int,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val overlayAlpha = remember { Animatable(0f) }
+    val trophyOffsetX = remember { Animatable(0f) }
+    val trophyAlpha = remember { Animatable(0f) }
+    var visible by remember { mutableStateOf(false) }
+
+    BoxWithConstraints(modifier = modifier) {
+        val widthPx = with(density) { maxWidth.toPx() }
+
+        LaunchedEffect(trigger, widthPx) {
+            if (trigger <= 0 || widthPx <= 0f) return@LaunchedEffect
+
+            visible = true
+            overlayAlpha.snapTo(0f)
+            trophyAlpha.snapTo(1f)
+            trophyOffsetX.snapTo(-widthPx)
+
+            // 1) Darken the red corporate background to focus the animation.
+            overlayAlpha.animateTo(
+                targetValue = 0.58f,
+                animationSpec = tween(durationMillis = 280)
+            )
+
+            // 2) Trophy enters from left edge and lands at center.
+            trophyOffsetX.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 760, easing = FastOutSlowInEasing)
+            )
+
+            delay(420)
+
+            // 3) Fade out trophy and remove overlay.
+            trophyAlpha.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 260)
+            )
+            overlayAlpha.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 230)
+            )
+
+            visible = false
+        }
+
+        if (visible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF3B0000).copy(alpha = overlayAlpha.value))
+            )
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .graphicsLayer {
+                        translationX = trophyOffsetX.value
+                        alpha = trophyAlpha.value
+                    }
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFFD32F2F), Color(0xFFB71C1C))
+                        ),
+                        shape = CircleShape
+                    )
+                    .border(1.5.dp, Color.White.copy(alpha = 0.85f), CircleShape)
+                    .padding(20.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.EmojiEvents,
+                    contentDescription = "Debug trophy",
+                    tint = Color.White,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
         }
     }
 }
