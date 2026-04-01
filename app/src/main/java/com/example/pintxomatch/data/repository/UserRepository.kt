@@ -44,6 +44,23 @@ class UserRepository {
         }
     }
 
+    suspend fun syncUploaderProfileToPintxos(uid: String, displayName: String, photoUrl: String) {
+        val updates = mutableMapOf<String, Any>()
+        if (displayName.isNotBlank()) updates["uploaderDisplayName"] = displayName
+        updates["uploaderPhotoUrl"] = photoUrl
+
+        if (updates.isEmpty()) return
+
+        val docs = firestore.collection("Pintxos")
+            .whereEqualTo("uploaderUid", uid)
+            .get()
+            .await()
+
+        for (doc in docs.documents) {
+            doc.reference.update(updates).await()
+        }
+    }
+
     suspend fun getPublicProfile(uid: String): LeaderboardUser? {
         // By default, LeaderboardUser serves well as a public profile model 
         // We calculate uploads dynamically from Pintxos collection as done in Leaderboard

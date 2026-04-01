@@ -238,6 +238,17 @@ object ImageRepository {
         if (!isUsingLocalProvider()) return imageUrl
 
         val rawUrl = imageUrl.trim()
+        val base = BuildConfig.LOCAL_IMAGE_BASE_URL.trimEnd('/')
+
+        // Local image-server URLs always expose files under /uploads.
+        // Rewriting by suffix keeps old localhost/10.0.2.2/trycloudflare hosts working
+        // after switching to a new tunnel domain.
+        val uploadsPathIndex = rawUrl.indexOf("/uploads/", ignoreCase = true)
+        if (uploadsPathIndex >= 0) {
+            val suffix = rawUrl.substring(uploadsPathIndex)
+            return "$base$suffix"
+        }
+
         val legacyPrefixes = listOf(
             "http://localhost:8080",
             "https://localhost:8080",
@@ -249,7 +260,6 @@ object ImageRepository {
             ?: return imageUrl
 
         val suffix = rawUrl.substring(matchedPrefix.length)
-        val base = BuildConfig.LOCAL_IMAGE_BASE_URL.trimEnd('/')
         return if (suffix.isBlank()) base else "$base$suffix"
     }
 

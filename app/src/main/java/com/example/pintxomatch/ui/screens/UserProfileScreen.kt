@@ -35,6 +35,7 @@ import com.example.pintxomatch.data.repository.AuthRepository
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -399,11 +400,33 @@ fun UserProfileScreen(
                                     if (trimmedName.isEmpty()) { alertMessage = "Nombre vacío"; return@EditProfileForm }
                                     coroutineScope.launch {
                                         isSavingProfile = true
-                                        userRepository.updateCommentsEnabled(targetUid, commentsEnabled)
-                                        val oldImageUrl = user?.photoUrl?.toString()
-                                        val uploadedUrl = if (selectedProfileImageUri != null) ImageRepository.uploadImage(context, selectedProfileImageUri!!, "pintxomatch/profiles") else oldImageUrl
-                                        val updates = userProfileChangeRequest { displayName = trimmedName; if (!uploadedUrl.isNullOrBlank()) photoUri = Uri.parse(uploadedUrl) }
-                                        user?.updateProfile(updates)?.addOnSuccessListener {
+                                        try {
+                                            userRepository.updateCommentsEnabled(targetUid, commentsEnabled)
+
+                                            val oldImageUrl = user?.photoUrl?.toString()
+                                            val uploadedUrl = if (selectedProfileImageUri != null) {
+                                                ImageRepository.uploadImage(context, selectedProfileImageUri!!, "pintxomatch/profiles")
+                                            } else {
+                                                oldImageUrl
+                                            }
+
+                                            val updates = userProfileChangeRequest {
+                                                displayName = trimmedName
+                                                if (!uploadedUrl.isNullOrBlank()) {
+                                                    photoUri = Uri.parse(uploadedUrl)
+                                                }
+                                            }
+
+                                            user?.updateProfile(updates)?.await()
+
+                                            if (user != null) {
+                                                userRepository.syncUploaderProfileToPintxos(
+                                                    uid = user.uid,
+                                                    displayName = trimmedName,
+                                                    photoUrl = uploadedUrl.orEmpty()
+                                                )
+                                            }
+
                                             // Delete old image if it was replaced with a new one
                                             if (selectedProfileImageUri != null && !oldImageUrl.isNullOrBlank() && uploadedUrl != oldImageUrl) {
                                                 val oldId = ImageRepository.extractPublicIdFromUrl(oldImageUrl)
@@ -411,7 +434,14 @@ fun UserProfileScreen(
                                                     coroutineScope.launch { ImageRepository.deleteImageByToken(oldId) }
                                                 }
                                             }
-                                            isSavingProfile = false; isEditing = false; selectedProfileImageUri = null; alertMessage = "Perfil actualizado"
+
+                                            isSavingProfile = false
+                                            isEditing = false
+                                            selectedProfileImageUri = null
+                                            alertMessage = "Perfil actualizado"
+                                        } catch (e: Exception) {
+                                            isSavingProfile = false
+                                            alertMessage = "No se pudo actualizar el perfil"
                                         }
                                     }
                                 }
