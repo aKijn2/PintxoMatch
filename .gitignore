@@ -30,6 +30,9 @@ google-services.json
 # --- Logs ---
 *.log
 
+# --- Local tunnel runtime state ---
+scripts/.cloudflare-tunnel.json
+
 # --- OS files ---
 .DS_Store
 Thumbs.db
