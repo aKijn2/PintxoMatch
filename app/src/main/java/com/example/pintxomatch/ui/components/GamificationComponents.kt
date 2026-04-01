@@ -3,19 +3,18 @@ package com.example.pintxomatch.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,14 +41,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.pintxomatch.ui.viewmodel.WeeklyChallengeUiItem
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -102,13 +106,13 @@ fun GamificationProfileSection(
                     Text(
                         text = "$xp XP",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.75f)
+                        color = Color.White
                     )
                 }
 
                 Row(
                     modifier = Modifier.clickable {
-                        // Temporary debug replay hook: tap streak icon row to inspect trophy sequence.
+                        // Temporary debug replay hook: tap streak row to replay the sequence.
                         debugSequenceTrigger += 1
                     },
                     verticalAlignment = Alignment.CenterVertically,
@@ -196,7 +200,7 @@ fun WeeklyChallengeCard(
             )
             Text(
                 text = challenge.description,
-                color = Color.White.copy(alpha = 0.7f),
+                color = Color.White.copy(alpha = 0.85f),
                 style = MaterialTheme.typography.bodySmall
             )
 
@@ -217,7 +221,7 @@ fun WeeklyChallengeCard(
                 Text(
                     text = challenge.progressText,
                     modifier = Modifier.testTag("weekly_challenge_progress_${challenge.id}"),
-                    color = Color.White.copy(alpha = 0.82f),
+                    color = Color.White,
                     style = MaterialTheme.typography.labelLarge
                 )
                 Text(
@@ -277,113 +281,145 @@ private fun DebugTrophySequenceOverlay(
     var visible by remember { mutableStateOf(false) }
     var textVisible by remember { mutableStateOf(false) }
 
-    BoxWithConstraints(modifier = modifier) {
-        val widthPx = with(density) { maxWidth.toPx() }
+    LaunchedEffect(trigger) {
+        if (trigger <= 0) return@LaunchedEffect
+        visible = true
+    }
 
-        LaunchedEffect(trigger, widthPx) {
-            if (trigger <= 0 || widthPx <= 0f) return@LaunchedEffect
-
-            visible = true
-            textVisible = false
-            overlayAlpha.snapTo(0f)
-            contentAlpha.snapTo(1f)
-            trophyOffsetX.snapTo(-widthPx)
-
-            // 1) Darken the red corporate background to focus the animation.
-            overlayAlpha.animateTo(
-                targetValue = 0.58f,
-                animationSpec = tween(durationMillis = 280)
+    if (visible) {
+        Dialog(
+            onDismissRequest = {},
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false
             )
-
-            // 2) Trophy enters from left edge and lands at center.
-            trophyOffsetX.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(durationMillis = 760, easing = FastOutSlowInEasing)
-            )
-
-            // 3) Text appears after trophy reaches center with a soft upward entrance.
-            delay(90)
-            textVisible = true
-
-            delay(720)
-
-            // 4) Fade out trophy + text together and remove overlay.
-            contentAlpha.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(durationMillis = 300)
-            )
-            overlayAlpha.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(durationMillis = 280)
-            )
-
-            textVisible = false
-            visible = false
-        }
-
-        if (visible) {
-            Box(
-                modifier = Modifier
+        ) {
+            BoxWithConstraints(
+                modifier = modifier
                     .fillMaxSize()
-                    .background(Color(0xFF3B0000).copy(alpha = overlayAlpha.value))
-            )
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .graphicsLayer {
-                        translationX = trophyOffsetX.value
-                        alpha = contentAlpha.value
-                    }
-                    .testTag("debug_trophy_sequence")
+                    .testTag("debug_trophy_overlay")
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(Color(0xFFD32F2F), Color(0xFFB71C1C))
-                                ),
-                                shape = CircleShape
-                            )
-                            .border(1.5.dp, Color.White.copy(alpha = 0.85f), CircleShape)
-                            .padding(20.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = "Debug trophy",
-                            tint = Color.White,
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
+                val widthPx = with(density) { maxWidth.toPx() }
 
-                    AnimatedVisibility(
-                        visible = textVisible,
-                        enter = fadeIn(animationSpec = tween(durationMillis = 260)) +
-                            slideInVertically(
-                                animationSpec = tween(durationMillis = 260),
-                                initialOffsetY = { it / 2 }
-                            )
+                LaunchedEffect(trigger, widthPx) {
+                    if (trigger <= 0 || widthPx <= 0f) return@LaunchedEffect
+
+                    textVisible = false
+                    overlayAlpha.snapTo(0f)
+                    contentAlpha.snapTo(1f)
+                    trophyOffsetX.snapTo(-widthPx)
+
+                    // 1) Black semitransparent curtain for guaranteed readability.
+                    overlayAlpha.animateTo(
+                        targetValue = 0.8f,
+                        animationSpec = tween(durationMillis = 300)
+                    )
+
+                    // 2) Trophy enters from left and lands centered.
+                    trophyOffsetX.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 780, easing = FastOutSlowInEasing)
+                    )
+
+                    // 3) Text appears just after the trophy reaches center.
+                    delay(90)
+                    textVisible = true
+
+                    // 4) Keep content visible long enough to read and evaluate.
+                    delay(2300)
+
+                    // 5) Fade out trophy + text + overlay together.
+                    contentAlpha.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 320)
+                    )
+                    overlayAlpha.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 320)
+                    )
+
+                    textVisible = false
+                    visible = false
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = overlayAlpha.value))
+                )
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .graphicsLayer {
+                            translationX = trophyOffsetX.value
+                            alpha = contentAlpha.value
+                        }
+                        .testTag("debug_trophy_sequence")
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(Color(0xFFD32F2F), Color(0xFFB71C1C))
+                                    ),
+                                    shape = CircleShape
+                                )
+                                .border(1.5.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                                .padding(20.dp)
                         ) {
-                            Text(
-                                text = "NUEVA INSIGNIA!",
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold
+                            Icon(
+                                imageVector = Icons.Default.EmojiEvents,
+                                contentDescription = "Debug trophy",
+                                tint = Color.White,
+                                modifier = Modifier.size(48.dp)
                             )
-                            Text(
-                                text = badgeName.toBadgeDisplayName(),
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                        }
+
+                        AnimatedVisibility(
+                            visible = textVisible,
+                            enter = fadeIn(animationSpec = tween(durationMillis = 260)) +
+                                slideInVertically(
+                                    animationSpec = tween(durationMillis = 260),
+                                    initialOffsetY = { it / 3 }
+                                )
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "NUEVA INSIGNIA!",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.75f),
+                                            offset = Offset(0f, 2f),
+                                            blurRadius = 8f
+                                        )
+                                    ),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = badgeName.toBadgeDisplayName(),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.75f),
+                                            offset = Offset(0f, 2f),
+                                            blurRadius = 8f
+                                        )
+                                    ),
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
