@@ -28,7 +28,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.pintxomatch.ui.components.ModernTopToast
+import com.example.pintxomatch.data.model.GamificationActionType
 import com.example.pintxomatch.data.repository.AuthRepository
+import com.example.pintxomatch.data.repository.GamificationRepository
 import com.example.pintxomatch.data.repository.ImageRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.sp
 fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val gamificationRepository = remember { GamificationRepository() }
 
     // VARIABLES DE ESTADO
     var nombrePintxo by remember { mutableStateOf("") }
@@ -167,6 +170,17 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
             db.collection("Pintxos").add(pintxo)
                 .addOnSuccessListener {
                     isUploading = false
+                    val currentUid = currentUser?.uid
+                    if (!currentUid.isNullOrBlank()) {
+                        coroutineScope.launch {
+                            runCatching {
+                                gamificationRepository.awardXpForAction(
+                                    uid = currentUid,
+                                    actionType = GamificationActionType.UPLOAD_PINTXO
+                                )
+                            }
+                        }
+                    }
                     alertMessage = "Pintxo publicado con éxito"
                     onNavigateBack()
                 }

@@ -69,6 +69,8 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.pintxomatch.data.repository.ChatRepository
+import com.example.pintxomatch.data.model.GamificationActionType
+import com.example.pintxomatch.data.repository.GamificationRepository
 import kotlin.math.absoluteValue
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.material.icons.filled.Star
@@ -111,6 +113,7 @@ fun HomeReviewScreen(
     var checkingSupportTicket by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val chatRepository = remember { ChatRepository() }
+    val gamificationRepository = remember { GamificationRepository() }
     val userPhotoUrl = remember {
         ImageRepository.normalizeImageUrlForCurrentProvider(auth.currentUser?.photoUrl?.toString())
     }
@@ -280,6 +283,11 @@ fun HomeReviewScreen(
                 }
             }
             notify("Valoracion guardada")
+            coroutineScope.launch {
+                runCatching {
+                    gamificationRepository.awardXpForAction(uid, GamificationActionType.RATE_PINTXO)
+                }
+            }
         }.addOnFailureListener {
             notify("No se pudo guardar la valoracion")
         }

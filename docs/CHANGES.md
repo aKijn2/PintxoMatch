@@ -1,5 +1,22 @@
 # PintxoMatch — Image System: Architecture & Change Log
 
+---
+
+## 2026-04-01 — Retención y Gamificación básica (completado)
+
+Se ha implementado un primer sistema de retención para aumentar recurrencia semanal:
+
+- XP por acción (valorar y subir pintxos) con transacción segura en Firestore.
+- Racha diaria (`currentStreak`) calculada por última acción (`lastActionTimestamp`).
+- Retos semanales activos con progreso por usuario.
+- Desbloqueo de badges al completar retos.
+- Nueva sección de perfil gamificada (nivel, XP, racha y badges).
+- Tarjetas de retos semanales con progreso animado.
+
+Pendiente inmediato:
+
+- Notificación premium al desbloquear badge (popup visual en UI).
+
 This document explains the full history of changes made to solve the image management problem in PintxoMatch (old images not being deleted when a pintxo is updated) and the resulting image storage architecture.
 
 ---

@@ -26,7 +26,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.example.pintxomatch.data.model.Pintxo
+import com.example.pintxomatch.data.model.GamificationActionType
 import com.example.pintxomatch.data.repository.ImageRepository
+import com.example.pintxomatch.data.repository.GamificationRepository
 import com.example.pintxomatch.navigation.AppNavigation
 import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.ui.components.PintxoCard
@@ -90,6 +92,8 @@ fun MainSwipeScreen(
     var waitingSecondsLeft by remember { mutableStateOf(0) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     val firestore = FirebaseFirestore.getInstance()
+    val gamificationRepository = remember { GamificationRepository() }
+    val gamificationScope = rememberCoroutineScope()
 
     fun notify(message: String) {
         alertMessage = message
@@ -202,6 +206,11 @@ fun MainSwipeScreen(
                 }
             }
             notify("Valoración guardada")
+            gamificationScope.launch {
+                runCatching {
+                    gamificationRepository.awardXpForAction(uid, GamificationActionType.RATE_PINTXO)
+                }
+            }
         }.addOnFailureListener {
             notify("No se pudo guardar la valoración")
         }

@@ -50,11 +50,16 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import java.io.File
 import com.example.pintxomatch.ui.components.CommentsSection
+import com.example.pintxomatch.ui.components.GamificationProfileSection
+import com.example.pintxomatch.ui.components.WeeklyChallengeCard
+import com.example.pintxomatch.ui.viewmodel.GamificationViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +71,8 @@ fun UserProfileScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val userRepository = remember { com.example.pintxomatch.data.repository.UserRepository() }
+    val gamificationViewModel: GamificationViewModel = viewModel()
+    val gamificationState by gamificationViewModel.uiState.collectAsState()
 
     val user = AuthRepository.currentUser
     val currentUserId = user?.uid
@@ -149,6 +156,7 @@ fun UserProfileScreen(
     // Cargar estadísticas de Firestore o perfil público
     LaunchedEffect(targetUid) {
         isLoading = true
+        gamificationViewModel.load(targetUid)
         coroutineScope.launch {
             friendsCount = userRepository.getFriendsCount(targetUid)
             commentsEnabled = userRepository.areCommentsEnabled(targetUid)
@@ -185,10 +193,6 @@ fun UserProfileScreen(
     val colorContainer = MaterialTheme.colorScheme.surfaceContainerHigh // Modern M3 container
     val colorAccent = MaterialTheme.colorScheme.tertiary // For levels/badges
     val colorOnline = Color(0xFF4CAF50) // Standard green for status
-
-    // Nivel basado en pintxos (cada 5 pintxos es un nivel)
-    val level = (totalPintxos / 5).coerceAtLeast(0)
-    val progressToNextLevel = (totalPintxos % 5) / 5f
 
     Box(modifier = Modifier.fillMaxSize().background(colorBackground)) {
         // CONTENT
@@ -360,7 +364,7 @@ fun UserProfileScreen(
                                             ),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("$level", color = Color.White, fontWeight = FontWeight.Black, fontSize = 24.sp)
+                                        Text("${gamificationState.level}", color = Color.White, fontWeight = FontWeight.Black, fontSize = 24.sp)
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text("NIVEL", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = colorPrimary, letterSpacing = 0.5.sp)
@@ -450,8 +454,8 @@ fun UserProfileScreen(
                             // PREMIUM V2 DASHBOARD
                             DashboardContent(
                                 totalPintxos = totalPintxos,
-                                level = level,
-                                progress = progressToNextLevel,
+                                level = gamificationState.level,
+                                progress = gamificationState.levelProgress,
                                 isMyProfile = isMyProfile,
                                 isFriend = isFriend,
                                 loadingFriend = loadingFriendAction,
@@ -470,6 +474,65 @@ fun UserProfileScreen(
                                     }
                                 }
                             )
+
+                            Spacer(modifier = Modifier.height(28.dp))
+
+                            GamificationProfileSection(
+                                xp = gamificationState.xp,
+                                level = gamificationState.level,
+                                levelProgress = gamificationState.levelProgress,
+                                currentStreak = gamificationState.currentStreak,
+                                badges = gamificationState.badges
+                            )
+
+                            Spacer(modifier = Modifier.height(32.dp))
+
+                            Text(
+                                "RETOS SEMANALES",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colorPrimary,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.2.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            if (gamificationState.activeChallenges.isEmpty()) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = Color.Black.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(18.dp)
+                                ) {
+                                    Text(
+                                        text = "No hay retos activos ahora mismo",
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = colorOnSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    gamificationState.activeChallenges.forEach { challenge ->
+                                        WeeklyChallengeCard(
+                                            challenge = challenge,
+                                            modifier = Modifier.width(260.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            gamificationState.errorMessage?.let { error ->
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colorOnSurfaceVariant
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(32.dp))
 
@@ -565,6 +628,13 @@ private fun DashboardContent(
                         Text("${(progress * 100).toInt()}%", fontWeight = FontWeight.Black, fontSize = 14.sp)
                     }
                     Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Nivel $level",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = colorOnSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text("PRÓXIMO NIVEL", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = colorOnSurfaceVariant)
                 }
             }
