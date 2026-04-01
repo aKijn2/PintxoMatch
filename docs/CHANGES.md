@@ -12,10 +12,13 @@ Se ha implementado un primer sistema de retención para aumentar recurrencia sem
 - Desbloqueo de badges al completar retos.
 - Nueva sección de perfil gamificada (nivel, XP, racha y badges).
 - Tarjetas de retos semanales con progreso animado.
+- Popup premium animado al desbloquear badge (escala + glow sobre fondo oscuro).
+- Suite de tests añadida: reglas de dominio, integración lógica de repository, StateFlow en ViewModel y render Compose.
 
-Pendiente inmediato:
+Documentación y DX:
 
-- Notificación premium al desbloquear badge (popup visual en UI).
+- README renovado con arquitectura, setup y capa de gamificación.
+- Nueva documentación técnica de arquitectura para modelo Firebase de gamificación.
 
 This document explains the full history of changes made to solve the image management problem in PintxoMatch (old images not being deleted when a pintxo is updated) and the resulting image storage architecture.
 

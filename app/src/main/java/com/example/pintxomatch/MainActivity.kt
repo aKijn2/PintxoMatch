@@ -30,6 +30,7 @@ import com.example.pintxomatch.data.model.GamificationActionType
 import com.example.pintxomatch.data.repository.ImageRepository
 import com.example.pintxomatch.data.repository.GamificationRepository
 import com.example.pintxomatch.navigation.AppNavigation
+import com.example.pintxomatch.ui.components.BadgeUnlockedPopup
 import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.example.pintxomatch.ui.theme.PintxoMatchTheme
@@ -91,6 +92,7 @@ fun MainSwipeScreen(
     var waitingPintxoId by remember { mutableStateOf<String?>(null) }
     var waitingSecondsLeft by remember { mutableStateOf(0) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
+    var unlockedBadgeId by remember { mutableStateOf<String?>(null) }
     val firestore = FirebaseFirestore.getInstance()
     val gamificationRepository = remember { GamificationRepository() }
     val gamificationScope = rememberCoroutineScope()
@@ -209,6 +211,12 @@ fun MainSwipeScreen(
             gamificationScope.launch {
                 runCatching {
                     gamificationRepository.awardXpForAction(uid, GamificationActionType.RATE_PINTXO)
+                        .unlockedBadges
+                        .firstOrNull()
+                }.onSuccess { unlocked ->
+                    if (!unlocked.isNullOrBlank()) {
+                        unlockedBadgeId = unlocked
+                    }
                 }
             }
         }.addOnFailureListener {
@@ -655,6 +663,12 @@ fun MainSwipeScreen(
         message = alertMessage,
         onDismiss = { alertMessage = null },
         modifier = Modifier.align(Alignment.TopCenter)
+    )
+    BadgeUnlockedPopup(
+        visible = !unlockedBadgeId.isNullOrBlank(),
+        badgeId = unlockedBadgeId.orEmpty(),
+        onDismiss = { unlockedBadgeId = null },
+        modifier = Modifier.align(Alignment.Center)
     )
     } // end outer Box
 }

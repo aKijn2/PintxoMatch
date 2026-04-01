@@ -36,7 +36,7 @@ Estado actual (2026-04-01):
 * [x] Tarjetas de retos semanales con barra de progreso animada.
 
 Próximo incremento:
-* [ ] Notificación premium al desbloquear badge (popup visual con animación y branding de Food View X).
+* [x] Notificación premium al desbloquear badge (popup visual con animación y branding de Food View X).
 
 ---
 

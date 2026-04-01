@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import com.example.pintxomatch.data.model.Pintxo
 import com.example.pintxomatch.data.repository.ImageRepository
+import com.example.pintxomatch.ui.components.BadgeUnlockedPopup
 import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.ui.components.PintxoCard
 import com.google.firebase.auth.FirebaseAuth
@@ -108,6 +109,7 @@ fun HomeReviewScreen(
     var selectedFooterTab by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
+    var unlockedBadgeId by remember { mutableStateOf<String?>(null) }
     var showSupportTicketDialog by remember { mutableStateOf(false) }
     var supportTicketTitle by remember { mutableStateOf("") }
     var checkingSupportTicket by remember { mutableStateOf(false) }
@@ -286,6 +288,12 @@ fun HomeReviewScreen(
             coroutineScope.launch {
                 runCatching {
                     gamificationRepository.awardXpForAction(uid, GamificationActionType.RATE_PINTXO)
+                        .unlockedBadges
+                        .firstOrNull()
+                }.onSuccess { unlocked ->
+                    if (!unlocked.isNullOrBlank()) {
+                        unlockedBadgeId = unlocked
+                    }
                 }
             }
         }.addOnFailureListener {
@@ -592,6 +600,13 @@ fun HomeReviewScreen(
             message = alertMessage,
             onDismiss = { alertMessage = null },
             modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        BadgeUnlockedPopup(
+            visible = !unlockedBadgeId.isNullOrBlank(),
+            badgeId = unlockedBadgeId.orEmpty(),
+            onDismiss = { unlockedBadgeId = null },
+            modifier = Modifier.align(Alignment.Center)
         )
 
         if (showSupportTicketDialog) {

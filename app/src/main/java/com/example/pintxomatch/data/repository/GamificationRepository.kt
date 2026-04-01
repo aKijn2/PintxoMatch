@@ -29,14 +29,91 @@ data class AwardXpResult(
     val unlockedBadges: List<String>
 )
 
+interface GamificationGateway {
+    suspend fun upsertDefaultWeeklyChallengesForCurrentWeek(now: Long = System.currentTimeMillis())
+    suspend fun getGamificationState(uid: String): GamificationSnapshot
+    suspend fun awardXpForAction(uid: String, actionType: GamificationActionType): AwardXpResult
+}
+
+internal data class ChallengeProgressState(
+    val progressCount: Int = 0,
+    val completed: Boolean = false
+)
+
+internal data class ChallengeProgressResult(
+    val challenge: WeeklyChallenge,
+    val progressCount: Int,
+    val completed: Boolean,
+    val completedNow: Boolean
+)
+
+internal data class AwardComputation(
+    val updatedUser: UserGamification,
+    val progressByChallenge: Map<String, ChallengeProgressResult>,
+    val unlockedBadges: List<String>
+)
+
+internal fun computeAwardComputation(
+    currentGamification: UserGamification,
+    matchingChallenges: List<WeeklyChallenge>,
+    previousProgressByChallenge: Map<String, ChallengeProgressState>,
+    actionType: GamificationActionType,
+    now: Long
+): AwardComputation {
+    val updatedXp = currentGamification.xp + actionType.xpReward
+    val updatedStreak = GamificationRules.calculateUpdatedStreak(
+        previousStreak = currentGamification.currentStreak,
+        previousLastActionTimestamp = currentGamification.lastActionTimestamp,
+        actionTimestamp = now
+    )
+
+    val mutableBadges = currentGamification.badges.toMutableSet()
+    val unlockedBadges = mutableListOf<String>()
+    val progressResults = linkedMapOf<String, ChallengeProgressResult>()
+
+    matchingChallenges.forEach { challenge ->
+        val previous = previousProgressByChallenge[challenge.id] ?: ChallengeProgressState()
+        val nextProgress = if (previous.completed) {
+            previous.progressCount
+        } else {
+            (previous.progressCount + 1).coerceAtMost(challenge.targetCount)
+        }
+
+        val completedNow = !previous.completed && nextProgress >= challenge.targetCount
+        val finalCompleted = previous.completed || completedNow
+
+        if (completedNow && mutableBadges.add(challenge.badgeId)) {
+            unlockedBadges.add(challenge.badgeId)
+        }
+
+        progressResults[challenge.id] = ChallengeProgressResult(
+            challenge = challenge,
+            progressCount = nextProgress,
+            completed = finalCompleted,
+            completedNow = completedNow
+        )
+    }
+
+    return AwardComputation(
+        updatedUser = UserGamification(
+            xp = updatedXp,
+            currentStreak = updatedStreak,
+            lastActionTimestamp = now,
+            badges = mutableBadges.toList()
+        ),
+        progressByChallenge = progressResults,
+        unlockedBadges = unlockedBadges
+    )
+}
+
 class GamificationRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
-) {
+) : GamificationGateway {
 
     private val usersCollection = firestore.collection(USERS_COLLECTION)
     private val challengesCollection = firestore.collection(WEEKLY_CHALLENGES_COLLECTION)
 
-    suspend fun upsertDefaultWeeklyChallengesForCurrentWeek(now: Long = System.currentTimeMillis()) {
+    override suspend fun upsertDefaultWeeklyChallengesForCurrentWeek(now: Long) {
         val weekId = buildWeekId(now)
         val startsAt = now
         val endsAt = now + MILLIS_IN_WEEK
@@ -75,7 +152,7 @@ class GamificationRepository(
         }
     }
 
-    suspend fun getGamificationState(uid: String): GamificationSnapshot {
+    override suspend fun getGamificationState(uid: String): GamificationSnapshot {
         if (uid.isBlank()) {
             return GamificationSnapshot(UserGamification(), emptyList())
         }
@@ -109,7 +186,7 @@ class GamificationRepository(
         )
     }
 
-    suspend fun awardXpForAction(uid: String, actionType: GamificationActionType): AwardXpResult {
+    override suspend fun awardXpForAction(uid: String, actionType: GamificationActionType): AwardXpResult {
         if (uid.isBlank()) return AwardXpResult(0, 0, emptyList())
 
         val now = System.currentTimeMillis()
@@ -123,34 +200,27 @@ class GamificationRepository(
             val userSnapshot = transaction.get(userRef)
             val currentGamification = userSnapshot.toUserGamification()
 
-            val updatedXp = currentGamification.xp + actionType.xpReward
-            val updatedStreak = GamificationRules.calculateUpdatedStreak(
-                previousStreak = currentGamification.currentStreak,
-                previousLastActionTimestamp = currentGamification.lastActionTimestamp,
-                actionTimestamp = now
-            )
+            val previousProgress = matchingChallenges.associate { challenge ->
+                val progressRef = progressCollection.document(challenge.id)
+                val progressSnapshot = transaction.get(progressRef)
+                val state = ChallengeProgressState(
+                    progressCount = progressSnapshot.getLong("progressCount")?.toInt()?.coerceAtLeast(0) ?: 0,
+                    completed = progressSnapshot.getBoolean("completed") == true
+                )
+                challenge.id to state
+            }
 
-            val mutableBadges = currentGamification.badges.toMutableSet()
-            val unlockedBadges = mutableListOf<String>()
+            val computation = computeAwardComputation(
+                currentGamification = currentGamification,
+                matchingChallenges = matchingChallenges,
+                previousProgressByChallenge = previousProgress,
+                actionType = actionType,
+                now = now
+            )
 
             matchingChallenges.forEach { challenge ->
                 val progressRef = progressCollection.document(challenge.id)
-                val progressSnapshot = transaction.get(progressRef)
-
-                val alreadyCompleted = progressSnapshot.getBoolean("completed") == true
-                val previousProgress = progressSnapshot.getLong("progressCount")
-                    ?.toInt()
-                    ?.coerceAtLeast(0)
-                    ?: 0
-
-                val nextProgress = if (alreadyCompleted) {
-                    previousProgress
-                } else {
-                    (previousProgress + 1).coerceAtMost(challenge.targetCount)
-                }
-
-                val completedNow = !alreadyCompleted && nextProgress >= challenge.targetCount
-                val finalCompleted = alreadyCompleted || completedNow
+                val progressResult = computation.progressByChallenge[challenge.id] ?: return@forEach
 
                 val progressPayload = hashMapOf<String, Any>(
                     "challengeId" to challenge.id,
@@ -158,38 +228,34 @@ class GamificationRepository(
                     "description" to challenge.description,
                     "badgeId" to challenge.badgeId,
                     "targetCount" to challenge.targetCount,
-                    "progressCount" to nextProgress,
-                    "completed" to finalCompleted,
+                    "progressCount" to progressResult.progressCount,
+                    "completed" to progressResult.completed,
                     "weekId" to challenge.weekId,
                     "lastUpdatedAt" to now
                 )
-                if (completedNow) {
+                if (progressResult.completedNow) {
                     progressPayload["completedAt"] = now
                 }
 
                 transaction.set(progressRef, progressPayload, SetOptions.merge())
-
-                if (completedNow && mutableBadges.add(challenge.badgeId)) {
-                    unlockedBadges.add(challenge.badgeId)
-                }
             }
 
             val userPayload = hashMapOf<String, Any>(
-                "xp" to updatedXp,
-                "currentStreak" to updatedStreak,
+                "xp" to computation.updatedUser.xp,
+                "currentStreak" to computation.updatedUser.currentStreak,
                 "lastActionTimestamp" to now
             )
 
-            if (mutableBadges != currentGamification.badges.toSet()) {
-                userPayload["badges"] = mutableBadges.toList()
+            if (computation.updatedUser.badges.toSet() != currentGamification.badges.toSet()) {
+                userPayload["badges"] = computation.updatedUser.badges
             }
 
             transaction.set(userRef, userPayload, SetOptions.merge())
 
             AwardXpResult(
-                xp = updatedXp,
-                currentStreak = updatedStreak,
-                unlockedBadges = unlockedBadges
+                xp = computation.updatedUser.xp,
+                currentStreak = computation.updatedUser.currentStreak,
+                unlockedBadges = computation.unlockedBadges
             )
         }.await()
     }

@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,7 +49,9 @@ fun GamificationProfileSection(
     )
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("gamification_profile_section"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF101012)),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
@@ -67,6 +70,7 @@ fun GamificationProfileSection(
                 Column {
                     Text(
                         text = "Nivel $level",
+                        modifier = Modifier.testTag("gamification_level_text"),
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
@@ -85,6 +89,7 @@ fun GamificationProfileSection(
                     Text(text = "🔥", fontSize = 20.sp)
                     Text(
                         text = "$currentStreak dias",
+                        modifier = Modifier.testTag("gamification_streak_text"),
                         color = Color(0xFFFF7043),
                         fontWeight = FontWeight.SemiBold
                     )
@@ -139,7 +144,7 @@ fun WeeklyChallengeCard(
     val accent = if (challenge.isCompleted) Color(0xFF38D39F) else Color(0xFFFF2D55)
 
     Card(
-        modifier = modifier,
+        modifier = modifier.testTag("weekly_challenge_card_${challenge.id}"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF151518)),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.09f))
@@ -178,6 +183,7 @@ fun WeeklyChallengeCard(
             ) {
                 Text(
                     text = challenge.progressText,
+                    modifier = Modifier.testTag("weekly_challenge_progress_${challenge.id}"),
                     color = Color.White.copy(alpha = 0.82f),
                     style = MaterialTheme.typography.labelLarge
                 )

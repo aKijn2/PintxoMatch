@@ -3,9 +3,12 @@ package com.example.pintxomatch.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pintxomatch.data.model.GamificationActionType
+import com.example.pintxomatch.data.repository.GamificationGateway
 import com.example.pintxomatch.data.repository.GamificationRepository
 import com.example.pintxomatch.domain.gamification.GamificationRules
 import com.example.pintxomatch.domain.gamification.XP_PER_LEVEL
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +42,8 @@ data class GamificationUiState(
 )
 
 class GamificationViewModel(
-    private val repository: GamificationRepository = GamificationRepository()
+    private val repository: GamificationGateway = GamificationRepository(),
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GamificationUiState(isLoading = true))
@@ -51,7 +55,7 @@ class GamificationViewModel(
             return
         }
 
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcher) {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
                 repository.upsertDefaultWeeklyChallengesForCurrentWeek()
@@ -98,7 +102,7 @@ class GamificationViewModel(
     private fun grantXpForAction(uid: String, actionType: GamificationActionType) {
         if (uid.isBlank()) return
 
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcher) {
             try {
                 repository.awardXpForAction(uid, actionType)
                 load(uid)

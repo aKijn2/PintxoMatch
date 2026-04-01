@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import com.example.pintxomatch.ui.components.BadgeUnlockedPopup
 import com.example.pintxomatch.ui.components.ModernTopToast
 import com.example.pintxomatch.data.model.GamificationActionType
 import com.example.pintxomatch.data.repository.AuthRepository
@@ -35,6 +36,7 @@ import com.example.pintxomatch.data.repository.ImageRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.io.File
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +68,7 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
     var isUploading by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
+    var unlockedBadgeId by remember { mutableStateOf<String?>(null) }
 
     val pickMediaLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -167,27 +170,33 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
                 "timestamp" to System.currentTimeMillis()
             )
 
-            db.collection("Pintxos").add(pintxo)
-                .addOnSuccessListener {
-                    isUploading = false
-                    val currentUid = currentUser?.uid
-                    if (!currentUid.isNullOrBlank()) {
-                        coroutineScope.launch {
-                            runCatching {
-                                gamificationRepository.awardXpForAction(
-                                    uid = currentUid,
-                                    actionType = GamificationActionType.UPLOAD_PINTXO
-                                )
-                            }
-                        }
-                    }
-                    alertMessage = "Pintxo publicado con éxito"
-                    onNavigateBack()
+            try {
+                db.collection("Pintxos").add(pintxo).await()
+                isUploading = false
+
+                val currentUid = currentUser?.uid
+                val unlockedBadge = if (!currentUid.isNullOrBlank()) {
+                    runCatching {
+                        gamificationRepository.awardXpForAction(
+                            uid = currentUid,
+                            actionType = GamificationActionType.UPLOAD_PINTXO
+                        ).unlockedBadges.firstOrNull()
+                    }.getOrNull()
+                } else {
+                    null
                 }
-                .addOnFailureListener {
-                    isUploading = false
-                    alertMessage = "Error al subir"
+
+                if (!unlockedBadge.isNullOrBlank()) {
+                    unlockedBadgeId = unlockedBadge
+                    delay(1700)
                 }
+
+                alertMessage = "Pintxo publicado con éxito"
+                onNavigateBack()
+            } catch (_: Exception) {
+                isUploading = false
+                alertMessage = "Error al subir"
+            }
         }
     }
 
@@ -353,6 +362,13 @@ fun UploadPintxoScreen(onNavigateBack: () -> Unit) {
             message = alertMessage,
             onDismiss = { alertMessage = null },
             modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        BadgeUnlockedPopup(
+            visible = !unlockedBadgeId.isNullOrBlank(),
+            badgeId = unlockedBadgeId.orEmpty(),
+            onDismiss = { unlockedBadgeId = null },
+            modifier = Modifier.align(Alignment.Center)
         )
     }
 }
