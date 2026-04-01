@@ -55,7 +55,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import java.io.File
-import com.example.pintxomatch.ui.components.BadgeUnlockedPopup
 import com.example.pintxomatch.ui.components.CommentsSection
 import com.example.pintxomatch.ui.components.GamificationProfileSection
 import com.example.pintxomatch.ui.components.WeeklyChallengeCard
@@ -86,7 +85,6 @@ fun UserProfileScreen(
     var isEditing by remember { mutableStateOf(false) }
     var isSavingProfile by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
-    var debugBadgeReplayId by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
     // Estados adicionales para perfil publico
@@ -484,12 +482,7 @@ fun UserProfileScreen(
                                 level = gamificationState.level,
                                 levelProgress = gamificationState.levelProgress,
                                 currentStreak = gamificationState.currentStreak,
-                                badges = gamificationState.badges,
-                                onDebugReplayBadge = if (com.example.pintxomatch.BuildConfig.DEBUG) {
-                                    { debugBadgeReplayId = "badge_debug_critic" }
-                                } else {
-                                    null
-                                }
+                                badges = gamificationState.badges
                             )
 
                             Spacer(modifier = Modifier.height(32.dp))
@@ -571,13 +564,6 @@ fun UserProfileScreen(
         message = alertMessage,
         onDismiss = { alertMessage = null },
         modifier = Modifier.align(Alignment.TopCenter)
-    )
-    BadgeUnlockedPopup(
-        visible = !debugBadgeReplayId.isNullOrBlank(),
-        badgeId = debugBadgeReplayId.orEmpty(),
-        onDismiss = { debugBadgeReplayId = null },
-        modifier = Modifier.align(Alignment.Center),
-        autoDismissMillis = 3500L
     )
     } // closes Box
 } // closes UserProfileScreen
