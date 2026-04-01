@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.pintxomatch.data.repository.AuthRepository
+import com.example.pintxomatch.data.repository.ImageRepository
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -57,6 +58,9 @@ fun SettingsScreen(
     onLogout: () -> Unit
 ) {
     val user = AuthRepository.currentUser
+    val normalizedUserPhotoUrl = remember(user?.photoUrl?.toString()) {
+        ImageRepository.normalizeImageUrlForCurrentProvider(user?.photoUrl?.toString())
+    }
     var notificationsEnabled by remember { mutableStateOf(true) }
     var reviewNotificationsEnabled by remember { mutableStateOf(true) }
     var supportNotificationsEnabled by remember { mutableStateOf(true) }
@@ -113,9 +117,9 @@ fun SettingsScreen(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
-                            if (!user?.photoUrl?.toString().isNullOrBlank()) {
+                            if (!normalizedUserPhotoUrl.isNullOrBlank()) {
                                 AsyncImage(
-                                    model = user?.photoUrl,
+                                    model = normalizedUserPhotoUrl,
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
