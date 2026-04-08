@@ -379,298 +379,378 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                    item {
-                        ReviewsSectionSwitcher(
-                            selectedTab = selectedSectionTab,
-                            communityReviewsCount = reviews.size,
-                            onTabSelected = { selectedSectionTab = it },
-                            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
-                        )
-                    }
+                        item {
+                            ReviewsSectionSwitcher(
+                                selectedTab = selectedSectionTab,
+                                communityReviewsCount = reviews.size,
+                                onTabSelected = { selectedSectionTab = it },
+                                modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
+                            )
+                        }
 
-                    if (selectedSectionTab == ReviewsSectionTab.Write) {
-                    item {
-                        ReviewsWriteHighlights(
-                            ratedPintxosCount = ratedPintxos.size,
-                            myReviewsCount = myReviewsCount,
-                            communityReviewsCount = reviews.size,
-                            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
-                        )
-                    }
-
-                    item {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
-                            shape = RoundedCornerShape(24.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f)),
-                            shadowElevation = 1.dp
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(20.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Text(
-                                    text = "Publica o actualiza tu reseña",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                        if (selectedSectionTab == ReviewsSectionTab.Write) {
+                            item {
+                                ReviewsWriteHighlights(
+                                    ratedPintxosCount = ratedPintxos.size,
+                                    myReviewsCount = myReviewsCount,
+                                    communityReviewsCount = reviews.size,
+                                    modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
                                 )
-                                Text(
-                                    text = "Selecciona un pintxo valorado y comparte tu experiencia para ayudar a la comunidad.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colorOnSurfaceVariant
-                                )
-
-                                if (ratedPintxos.isEmpty()) {
-                                    Surface(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(16.dp),
-                                        color = colorOnSurfaceVariant.copy(alpha = 0.07f)
+                            }
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+                                    shape = RoundedCornerShape(26.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.16f)),
+                                    shadowElevation = 4.dp
+                                ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                        verticalArrangement = Arrangement.spacedBy(14.dp)
                                     ) {
-                                        Text(
-                                            text = "Valora un pintxo primero para poder escribir una reseña.",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = colorOnSurfaceVariant,
-                                            modifier = Modifier.padding(14.dp)
-                                        )
-                                    }
-                                } else {
-                                    val filteredOptions = ratedPintxos.filter {
-                                        selectionSearch.isBlank() ||
-                                            it.name.contains(selectionSearch, ignoreCase = true) ||
-                                            it.barName.contains(selectionSearch, ignoreCase = true)
-                                    }
-
-                                    // Pintxo picker
-                                    ExposedDropdownMenuBox(
-                                        expanded = showPintxoDropdown,
-                                        onExpandedChange = { showPintxoDropdown = it }
-                                    ) {
-                                        OutlinedTextField(
-                                            value = if (selectionSearch.isNotBlank()) selectionSearch else selectedPintxoName,
-                                            onValueChange = {
-                                                selectionSearch = it
-                                                showPintxoDropdown = true
-                                            },
-                                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                                            label = { Text("Pintxo") },
-                                            placeholder = { Text("Busca o elige un pintxo") },
-                                            trailingIcon = {
-                                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = showPintxoDropdown)
-                                            },
-                                            shape = RoundedCornerShape(20.dp),
-                                            singleLine = true,
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedBorderColor = colorPrimary,
-                                                unfocusedBorderColor = Color.Transparent,
-                                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
-                                            )
-                                        )
-                                        ExposedDropdownMenu(
-                                            expanded = showPintxoDropdown,
-                                            onDismissRequest = {
-                                                showPintxoDropdown = false
-                                                selectionSearch = ""
-                                            }
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(18.dp),
+                                            color = colorPrimary.copy(alpha = 0.10f),
+                                            border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.20f))
                                         ) {
-                                            if (filteredOptions.isEmpty()) {
-                                                DropdownMenuItem(
-                                                    text = { Text("Sin resultados", color = colorOnSurfaceVariant) },
-                                                    onClick = {}
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(
+                                                        text = "Tu opinión cuenta",
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+
+                                                    if (editingReviewId != null) {
+                                                        Surface(
+                                                            shape = RoundedCornerShape(50),
+                                                            color = colorPrimary,
+                                                            border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.9f))
+                                                        ) {
+                                                            Text(
+                                                                text = "Editando",
+                                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                Text(
+                                                    text = "Selecciona un pintxo valorado y comparte una reseña clara y útil para la comunidad.",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = colorOnSurfaceVariant
                                                 )
-                                            } else {
-                                                filteredOptions.forEach { option ->
-                                                    DropdownMenuItem(
-                                                        text = {
-                                                            Column {
-                                                                Text(option.name, fontWeight = FontWeight.SemiBold)
+                                            }
+                                        }
+
+                                        if (ratedPintxos.isEmpty()) {
+                                            Surface(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(16.dp),
+                                                color = colorOnSurfaceVariant.copy(alpha = 0.07f),
+                                                border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.18f))
+                                            ) {
+                                                Text(
+                                                    text = "Valora un pintxo primero para poder escribir una reseña.",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = colorOnSurfaceVariant,
+                                                    modifier = Modifier.padding(14.dp)
+                                                )
+                                            }
+                                        } else {
+                                            val filteredOptions = ratedPintxos.filter {
+                                                selectionSearch.isBlank() ||
+                                                    it.name.contains(selectionSearch, ignoreCase = true) ||
+                                                    it.barName.contains(selectionSearch, ignoreCase = true)
+                                            }
+
+                                            ExposedDropdownMenuBox(
+                                                expanded = showPintxoDropdown,
+                                                onExpandedChange = { showPintxoDropdown = it }
+                                            ) {
+                                                OutlinedTextField(
+                                                    value = if (selectionSearch.isNotBlank()) selectionSearch else selectedPintxoName,
+                                                    onValueChange = {
+                                                        selectionSearch = it
+                                                        showPintxoDropdown = true
+                                                    },
+                                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                                    label = { Text("Pintxo") },
+                                                    placeholder = { Text("Busca o elige un pintxo") },
+                                                    trailingIcon = {
+                                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = showPintxoDropdown)
+                                                    },
+                                                    shape = RoundedCornerShape(20.dp),
+                                                    singleLine = true,
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedBorderColor = colorPrimary,
+                                                        unfocusedBorderColor = Color.Transparent,
+                                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+                                                    )
+                                                )
+                                                ExposedDropdownMenu(
+                                                    expanded = showPintxoDropdown,
+                                                    onDismissRequest = {
+                                                        showPintxoDropdown = false
+                                                        selectionSearch = ""
+                                                    }
+                                                ) {
+                                                    if (filteredOptions.isEmpty()) {
+                                                        DropdownMenuItem(
+                                                            text = { Text("Sin resultados", color = colorOnSurfaceVariant) },
+                                                            onClick = {}
+                                                        )
+                                                    } else {
+                                                        filteredOptions.forEach { option ->
+                                                            DropdownMenuItem(
+                                                                text = {
+                                                                    Column {
+                                                                        Text(option.name, fontWeight = FontWeight.SemiBold)
+                                                                        Text(
+                                                                            "${option.barName} · tu nota ${option.myStars}★",
+                                                                            style = MaterialTheme.typography.bodySmall,
+                                                                            color = colorOnSurfaceVariant
+                                                                        )
+                                                                    }
+                                                                },
+                                                                onClick = {
+                                                                    selectedPintxoId = option.id
+                                                                    selectedPintxoName = option.name
+                                                                    val myReview = reviews
+                                                                        .filter { it.userUid == currentUid && it.pintxoId == option.id }
+                                                                        .maxByOrNull { it.createdAt }
+                                                                    if (myReview != null) {
+                                                                        editingReviewId = myReview.id
+                                                                        reviewText = myReview.text
+                                                                        selectedStars = myReview.stars
+                                                                    } else {
+                                                                        editingReviewId = null
+                                                                        reviewText = ""
+                                                                        selectedStars = option.myStars
+                                                                    }
+                                                                    selectionSearch = ""
+                                                                    showPintxoDropdown = false
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Text(
+                                                    text = "Tu valoración",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = colorOnSurfaceVariant
+                                                )
+
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    (1..5).forEach { star ->
+                                                        val selected = star <= selectedStars
+                                                        Surface(
+                                                            modifier = Modifier
+                                                                .weight(1f)
+                                                                .height(44.dp)
+                                                                .clip(RoundedCornerShape(12.dp))
+                                                                .clickable(
+                                                                    interactionSource = remember { MutableInteractionSource() },
+                                                                    indication = null
+                                                                ) { selectedStars = star },
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            color = if (selected) Color(0xFFFFC107).copy(alpha = 0.18f)
+                                                            else MaterialTheme.colorScheme.surfaceContainerLow,
+                                                            border = BorderStroke(
+                                                                1.dp,
+                                                                if (selected) Color(0xFFFFC107).copy(alpha = 0.5f)
+                                                                else colorOnSurfaceVariant.copy(alpha = 0.20f)
+                                                            )
+                                                        ) {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxSize(),
+                                                                horizontalArrangement = Arrangement.Center,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = if (selected) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                                                                    contentDescription = "$star estrellas",
+                                                                    tint = if (selected) Color(0xFFFFC107) else colorOnSurfaceVariant.copy(alpha = 0.45f),
+                                                                    modifier = Modifier.size(18.dp)
+                                                                )
+                                                                Spacer(modifier = Modifier.width(4.dp))
                                                                 Text(
-                                                                    "${option.barName} · tu nota ${option.myStars}★",
-                                                                    style = MaterialTheme.typography.bodySmall,
-                                                                    color = colorOnSurfaceVariant
+                                                                    text = star.toString(),
+                                                                    style = MaterialTheme.typography.labelMedium,
+                                                                    fontWeight = FontWeight.SemiBold,
+                                                                    color = if (selected) Color(0xFF8B6914) else colorOnSurfaceVariant
                                                                 )
                                                             }
-                                                        },
-                                                        onClick = {
-                                                            selectedPintxoId = option.id
-                                                            selectedPintxoName = option.name
-                                                            val myReview = reviews
-                                                                .filter { it.userUid == currentUid && it.pintxoId == option.id }
-                                                                .maxByOrNull { it.createdAt }
-                                                            if (myReview != null) {
-                                                                editingReviewId = myReview.id
-                                                                reviewText = myReview.text
-                                                                selectedStars = myReview.stars
-                                                            } else {
-                                                                editingReviewId = null
-                                                                reviewText = ""
-                                                                selectedStars = option.myStars
-                                                            }
-                                                            selectionSearch = ""
-                                                            showPintxoDropdown = false
                                                         }
+                                                    }
+                                                }
+
+                                                if (selectedStars > 0) {
+                                                    Text(
+                                                        text = "Has seleccionado $selectedStars estrellas",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = colorPrimary,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                }
+                                            }
+
+                                            OutlinedTextField(
+                                                value = reviewText,
+                                                onValueChange = { reviewText = it },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                minLines = 4,
+                                                maxLines = 7,
+                                                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                                                label = { Text("Tu reseña") },
+                                                placeholder = { Text("Habla del sabor, textura, presentación y si lo recomendarías") },
+                                                shape = RoundedCornerShape(20.dp),
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedBorderColor = colorPrimary,
+                                                    unfocusedBorderColor = Color.Transparent,
+                                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+                                                )
+                                            )
+
+                                            Text(
+                                                text = "${reviewText.trim().length} caracteres",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = colorOnSurfaceVariant,
+                                                modifier = Modifier.align(Alignment.End)
+                                            )
+
+                                            FilledTonalButton(
+                                                onClick = { submitReview() },
+                                                enabled = !isSaving,
+                                                modifier = Modifier.fillMaxWidth().height(50.dp),
+                                                shape = RoundedCornerShape(20.dp),
+                                                colors = ButtonDefaults.filledTonalButtonColors(
+                                                    containerColor = colorPrimary,
+                                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                            ) {
+                                                if (isSaving) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(18.dp),
+                                                        strokeWidth = 2.dp,
+                                                        color = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        text = if (editingReviewId != null) "Actualizar reseña" else "Publicar reseña",
+                                                        fontWeight = FontWeight.SemiBold
                                                     )
                                                 }
                                             }
                                         }
                                     }
-
-                                    // Star picker
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(
-                                            text = "Tu valoración",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = colorOnSurfaceVariant
-                                        )
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            (1..5).forEach { star ->
-                                                Icon(
-                                                    imageVector = if (star <= selectedStars) Icons.Filled.Star else Icons.Outlined.StarOutline,
-                                                    contentDescription = "$star estrellas",
-                                                    tint = if (star <= selectedStars) Color(0xFFFFC107)
-                                                    else colorOnSurfaceVariant.copy(alpha = 0.35f),
-                                                    modifier = Modifier
-                                                        .size(32.dp)
-                                                        .clickable(
-                                                            interactionSource = remember { MutableInteractionSource() },
-                                                            indication = null
-                                                        ) { selectedStars = star }
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Review text
-                                    OutlinedTextField(
-                                        value = reviewText,
-                                        onValueChange = { reviewText = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        minLines = 4,
-                                        maxLines = 7,
-                                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                                        label = { Text("Tu reseña") },
-                                        placeholder = { Text("Habla del sabor, textura, presentación y si lo recomendarías") },
-                                        shape = RoundedCornerShape(20.dp),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = colorPrimary,
-                                            unfocusedBorderColor = Color.Transparent,
-                                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
-                                        )
-                                    )
-
-                                    // Submit button
-                                    FilledTonalButton(
-                                        onClick = { submitReview() },
-                                        enabled = !isSaving,
-                                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                                        shape = RoundedCornerShape(20.dp),
-                                        colors = ButtonDefaults.filledTonalButtonColors(
-                                            containerColor = colorPrimary.copy(alpha = 0.14f),
-                                            contentColor = colorPrimary
-                                        )
-                                    ) {
-                                        if (isSaving) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(18.dp),
-                                                strokeWidth = 2.dp,
-                                                color = colorPrimary
-                                            )
-                                        } else {
-                                            Text(
-                                                text = if (editingReviewId != null) "Actualizar reseña" else "Publicar reseña",
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-                                    }
                                 }
                             }
-                        }
-                    }
-                    } else {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .widthIn(max = 760.dp)
-                                .padding(top = 4.dp, bottom = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "Pintxos valorados por la comunidad",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            if (communityGroups.isNotEmpty()) {
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = colorPrimary.copy(alpha = 0.12f),
-                                    border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.25f))
+                        } else {
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .widthIn(max = 760.dp)
+                                        .padding(top = 4.dp, bottom = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
-                                        text = "${communityGroups.size}",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = colorPrimary,
-                                        fontWeight = FontWeight.Bold
+                                        text = "Pintxos valorados por la comunidad",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (communityGroups.isNotEmpty()) {
+                                        Surface(
+                                            shape = RoundedCornerShape(50),
+                                            color = colorPrimary.copy(alpha = 0.12f),
+                                            border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.25f))
+                                        ) {
+                                            Text(
+                                                text = "${communityGroups.size}",
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = colorPrimary,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            item {
+                                OutlinedTextField(
+                                    value = communitySearchQuery,
+                                    onValueChange = { communitySearchQuery = it },
+                                    modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+                                    singleLine = true,
+                                    label = { Text("Buscar pintxo") },
+                                    placeholder = { Text("Nombre del pintxo o bar") },
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colorPrimary,
+                                        unfocusedBorderColor = Color.Transparent,
+                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+                                    )
+                                )
+                            }
+
+                            if (filteredCommunityGroups.isEmpty()) {
+                                item {
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = MaterialTheme.colorScheme.surface,
+                                        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f))
+                                    ) {
+                                        Text(
+                                            text = if (communitySearchQuery.isBlank()) {
+                                                "Todavía no hay reseñas de comunidad para mostrar."
+                                            } else {
+                                                "No hay pintxos que coincidan con tu búsqueda."
+                                            },
+                                            modifier = Modifier.padding(18.dp),
+                                            color = colorOnSurfaceVariant,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            } else {
+                                items(filteredCommunityGroups) { group ->
+                                    PintxoCommunityCard(
+                                        group = group,
+                                        onOpenDetails = { expandedCommunityGroup = group },
+                                        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
                                     )
                                 }
                             }
                         }
-                    }
-
-                    item {
-                        OutlinedTextField(
-                            value = communitySearchQuery,
-                            onValueChange = { communitySearchQuery = it },
-                            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
-                            singleLine = true,
-                            label = { Text("Buscar pintxo") },
-                            placeholder = { Text("Nombre del pintxo o bar") },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = colorPrimary,
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
-                            )
-                        )
-                    }
-
-                    if (filteredCommunityGroups.isEmpty()) {
-                        item {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f))
-                            ) {
-                                Text(
-                                    text = if (communitySearchQuery.isBlank()) {
-                                        "Todavía no hay reseñas de comunidad para mostrar."
-                                    } else {
-                                        "No hay pintxos que coincidan con tu búsqueda."
-                                    },
-                                    modifier = Modifier.padding(18.dp),
-                                    color = colorOnSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        }
-                    } else {
-                        items(filteredCommunityGroups) { group ->
-                            PintxoCommunityCard(
-                                group = group,
-                                onOpenDetails = { expandedCommunityGroup = group },
-                                modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
-                            )
-                        }
-                    }
-                    }
                     }
                 }
             }
@@ -833,12 +913,13 @@ private fun ReviewStatChip(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
