@@ -1479,7 +1479,11 @@ private suspend fun fetchNearbyRestaurants(
             val lon = properties.optDouble("lon", Double.NaN)
             if (lat.isNaN() || lon.isNaN()) continue
 
-            val distanceMeters = properties.optInt("distance", -1)
+            // Calculamos la distancia exacta desde el móvil garantizando precisión
+            val distanceArray = FloatArray(1)
+            Location.distanceBetween(latitude, longitude, lat, lon, distanceArray)
+            val computedDistance = distanceArray[0].toInt()
+
             val address = properties.optString("address_line2", properties.optString("street"))
             
             // Mapeo fácil de categorías a español analizando toda la lista
@@ -1501,7 +1505,7 @@ private suspend fun fetchNearbyRestaurants(
                     address = address,
                     latitude = lat,
                     longitude = lon,
-                    distanceMeters = if (distanceMeters >= 0) distanceMeters else 0 // Geoapify ya da la distancia!
+                    distanceMeters = computedDistance
                 )
             )
         }
