@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
@@ -68,6 +69,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.pintxomatch.data.repository.ImageRepository
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 data class ReviewItem(
     val id: String,
@@ -88,6 +90,25 @@ private data class RatedPintxoOption(
     val myStars: Int
 )
 
+private enum class ReviewsSectionTab {
+    Write,
+    Community
+}
+
+private data class PintxoCommunitySummary(
+    val id: String,
+    val name: String,
+    val barName: String,
+    val imageUrl: String,
+    val averageRating: Double,
+    val ratingCount: Int
+)
+
+private data class PintxoCommunityGroup(
+    val summary: PintxoCommunitySummary,
+    val reviews: List<ReviewItem>
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewsScreen(onNavigateBack: () -> Unit) {
@@ -103,8 +124,10 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     var selectedStars by remember { mutableIntStateOf(0) }
     var editingReviewId by remember { mutableStateOf<String?>(null) }
     var reviews by remember { mutableStateOf<List<ReviewItem>>(emptyList()) }
+    var pintxosCommunity by remember { mutableStateOf<List<PintxoCommunitySummary>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
+    var selectedSectionTab by remember { mutableStateOf(ReviewsSectionTab.Write) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
 
     fun loadData() {
@@ -118,6 +141,32 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
 
         firestore.collection("Pintxos").get()
             .addOnSuccessListener { pintxoDocs ->
+                val loadedPintxosCommunity = pintxoDocs.documents.map { doc ->
+                    val rawRatings = doc.get("ratings") as? Map<*, *> ?: emptyMap<String, Any>()
+                    val numericRatings = rawRatings.values.mapNotNull { rating ->
+                        (rating as? Number)?.toInt()?.coerceIn(1, 5)
+                    }
+                    val fallbackRatingCount = numericRatings.size
+                    val ratingCount = doc.getLong("ratingCount")?.toInt()?.coerceAtLeast(0) ?: fallbackRatingCount
+                    val ratingTotal = doc.getDouble("ratingTotal") ?: numericRatings.sumOf { it.toDouble() }
+                    val averageRating = if (ratingCount > 0) {
+                        (doc.getDouble("averageRating") ?: (ratingTotal / ratingCount)).coerceIn(0.0, 5.0)
+                    } else {
+                        0.0
+                    }
+
+                    PintxoCommunitySummary(
+                        id = doc.id,
+                        name = doc.getString("nombre") ?: "Pintxo",
+                        barName = doc.getString("bar") ?: "Bar desconocido",
+                        imageUrl = ImageRepository.normalizeImageUrlForCurrentProvider(
+                            doc.getString("imageUrl")
+                        ).orEmpty(),
+                        averageRating = averageRating,
+                        ratingCount = ratingCount
+                    )
+                }
+
                 val loadedRatedPintxos = pintxoDocs.documents.mapNotNull { doc ->
                     val name = doc.getString("nombre") ?: "Sin nombre"
                     val barName = doc.getString("bar") ?: "Bar desconocido"
@@ -126,6 +175,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     RatedPintxoOption(id = doc.id, name = name, barName = barName, myStars = myRating)
                 }.sortedBy { it.name.lowercase() }
 
+                pintxosCommunity = loadedPintxosCommunity
                 ratedPintxos = loadedRatedPintxos
 
                 if (loadedRatedPintxos.none { it.id == selectedPintxoId }) {
@@ -270,6 +320,13 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     val colorBackground = MaterialTheme.colorScheme.background
     val colorPrimary = MaterialTheme.colorScheme.primary
     val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val currentUid = auth.currentUser?.uid.orEmpty()
+    val myReviewsCount = remember(reviews, currentUid) {
+        if (currentUid.isBlank()) 0 else reviews.count { it.userUid == currentUid }
+    }
+    val communityGroups = remember(reviews, pintxosCommunity) {
+        buildCommunityGroups(reviews = reviews, summaries = pintxosCommunity)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -305,7 +362,25 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                    // ── Write review card ──────────────────────────────────
+                    item {
+                        ReviewsSectionSwitcher(
+                            selectedTab = selectedSectionTab,
+                            communityReviewsCount = reviews.size,
+                            onTabSelected = { selectedSectionTab = it },
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
+                        )
+                    }
+
+                    if (selectedSectionTab == ReviewsSectionTab.Write) {
+                    item {
+                        ReviewsWriteHighlights(
+                            ratedPintxosCount = ratedPintxos.size,
+                            myReviewsCount = myReviewsCount,
+                            communityReviewsCount = reviews.size,
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
+                        )
+                    }
+
                     item {
                         Surface(
                             modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
@@ -319,10 +394,15 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 Text(
-                                    text = "Escribe tu reseña",
+                                    text = "Publica o actualiza tu reseña",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Selecciona un pintxo valorado y comparte tu experiencia para ayudar a la comunidad.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colorOnSurfaceVariant
                                 )
 
                                 if (ratedPintxos.isEmpty()) {
@@ -358,7 +438,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                             },
                                             modifier = Modifier.menuAnchor().fillMaxWidth(),
                                             label = { Text("Pintxo") },
-                                            placeholder = { Text("Elige el pintxo a reseñar") },
+                                            placeholder = { Text("Busca o elige un pintxo") },
                                             trailingIcon = {
                                                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = showPintxoDropdown)
                                             },
@@ -390,7 +470,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                                             Column {
                                                                 Text(option.name, fontWeight = FontWeight.SemiBold)
                                                                 Text(
-                                                                    "${option.barName} · ${option.myStars}★",
+                                                                    "${option.barName} · tu nota ${option.myStars}★",
                                                                     style = MaterialTheme.typography.bodySmall,
                                                                     color = colorOnSurfaceVariant
                                                                 )
@@ -400,7 +480,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                                             selectedPintxoId = option.id
                                                             selectedPintxoName = option.name
                                                             val myReview = reviews
-                                                                .filter { it.userUid == auth.currentUser?.uid && it.pintxoId == option.id }
+                                                                .filter { it.userUid == currentUid && it.pintxoId == option.id }
                                                                 .maxByOrNull { it.createdAt }
                                                             if (myReview != null) {
                                                                 editingReviewId = myReview.id
@@ -450,11 +530,11 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                         value = reviewText,
                                         onValueChange = { reviewText = it },
                                         modifier = Modifier.fillMaxWidth(),
-                                        minLines = 3,
-                                        maxLines = 6,
+                                        minLines = 4,
+                                        maxLines = 7,
                                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                                         label = { Text("Tu reseña") },
-                                        placeholder = { Text("Comparte tu experiencia con este pintxo…") },
+                                        placeholder = { Text("Habla del sabor, textura, presentación y si lo recomendarías") },
                                         shape = RoundedCornerShape(20.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedBorderColor = colorPrimary,
@@ -492,31 +572,30 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                             }
                         }
                     }
-
-                    // ── Section header ─────────────────────────────────────
+                    } else {
                     item {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .widthIn(max = 760.dp)
-                                .padding(top = 4.dp),
+                                .padding(top = 4.dp, bottom = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = "Últimas reseñas",
+                                text = "Pintxos valorados por la comunidad",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            if (reviews.isNotEmpty()) {
+                            if (communityGroups.isNotEmpty()) {
                                 Surface(
                                     shape = RoundedCornerShape(50),
                                     color = colorPrimary.copy(alpha = 0.12f),
                                     border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.25f))
                                 ) {
                                     Text(
-                                        text = "${reviews.size}",
+                                        text = "${communityGroups.size}",
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = colorPrimary,
@@ -527,29 +606,30 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                         }
                     }
 
-                    // ── Review list ────────────────────────────────────────
-                    if (reviews.isEmpty()) {
+                    if (communityGroups.isEmpty()) {
                         item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .widthIn(max = 760.dp)
-                                    .padding(vertical = 32.dp),
-                                contentAlignment = Alignment.Center
+                            Surface(
+                                modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f))
                             ) {
                                 Text(
-                                    "Todavía no hay reseñas publicadas.",
-                                    color = colorOnSurfaceVariant
+                                    text = "Todavía no hay reseñas de comunidad para mostrar.",
+                                    modifier = Modifier.padding(18.dp),
+                                    color = colorOnSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                             }
                         }
                     } else {
-                        items(reviews) { review ->
-                            ReviewCard(
-                                review = review,
+                        items(communityGroups) { group ->
+                            PintxoCommunityCard(
+                                group = group,
                                 modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
                             )
                         }
+                    }
                     }
                     }
                 }
@@ -564,120 +644,397 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     }
 }
 
+private fun buildCommunityGroups(
+    reviews: List<ReviewItem>,
+    summaries: List<PintxoCommunitySummary>
+): List<PintxoCommunityGroup> {
+    val summariesById = summaries.associateBy { it.id }
+
+    return reviews
+        .groupBy { it.pintxoId }
+        .map { (pintxoId, groupedReviews) ->
+            val sortedReviews = groupedReviews.sortedByDescending { it.createdAt }
+            val avgFromReviews = sortedReviews.map { it.stars }.average().takeIf { !it.isNaN() } ?: 0.0
+            val summary = summariesById[pintxoId]?.let { source ->
+                source.copy(
+                    averageRating = if (source.averageRating > 0.0) source.averageRating else avgFromReviews,
+                    ratingCount = maxOf(source.ratingCount, sortedReviews.size)
+                )
+            } ?: PintxoCommunitySummary(
+                id = if (pintxoId.isBlank()) "unknown_${sortedReviews.first().id}" else pintxoId,
+                name = sortedReviews.firstOrNull()?.pintxoName ?: "Pintxo",
+                barName = "Comunidad",
+                imageUrl = "",
+                averageRating = avgFromReviews,
+                ratingCount = sortedReviews.size
+            )
+
+            PintxoCommunityGroup(summary = summary, reviews = sortedReviews)
+        }
+        .sortedWith(
+            compareByDescending<PintxoCommunityGroup> { it.summary.averageRating }
+                .thenByDescending { it.reviews.size }
+        )
+}
+
 @Composable
-private fun ReviewCard(review: ReviewItem, modifier: Modifier = Modifier) {
+private fun ReviewsSectionSwitcher(
+    selectedTab: ReviewsSectionTab,
+    communityReviewsCount: Int,
+    onTabSelected: (ReviewsSectionTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colorPrimary = MaterialTheme.colorScheme.primary
     val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f)),
+        shadowElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(ReviewsSectionTab.Write, ReviewsSectionTab.Community).forEach { tab ->
+                val selected = tab == selectedTab
+                val containerColor by animateColorAsState(
+                    targetValue = if (selected) colorPrimary else colorPrimary.copy(alpha = 0.10f),
+                    label = "reviewsTabContainer"
+                )
+                val textColor by animateColorAsState(
+                    targetValue = if (selected) MaterialTheme.colorScheme.onPrimary else colorPrimary,
+                    label = "reviewsTabText"
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onTabSelected(tab) },
+                    color = containerColor,
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(
+                        text = when (tab) {
+                            ReviewsSectionTab.Write -> "Escribir"
+                            ReviewsSectionTab.Community -> "Comunidad"
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        color = textColor,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewsWriteHighlights(
+    ratedPintxosCount: Int,
+    myReviewsCount: Int,
+    communityReviewsCount: Int,
+    modifier: Modifier = Modifier
+) {
     val colorPrimary = MaterialTheme.colorScheme.primary
 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
+        color = colorPrimary.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.18f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ReviewStatChip(
+                title = "Valorados",
+                value = ratedPintxosCount.toString(),
+                modifier = Modifier.weight(1f)
+            )
+            ReviewStatChip(
+                title = "Tus reseñas",
+                value = myReviewsCount.toString(),
+                modifier = Modifier.weight(1f)
+            )
+            ReviewStatChip(
+                title = "Comunidad",
+                value = communityReviewsCount.toString(),
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReviewStatChip(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun PintxoCommunityCard(
+    group: PintxoCommunityGroup,
+    modifier: Modifier = Modifier
+) {
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val topReviews = group.reviews.take(3)
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f)),
         shadowElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Header row: avatar + name/pintxo + stars
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(170.dp)
+                    .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
             ) {
-                // Avatar
-                Surface(
-                    modifier = Modifier.size(44.dp),
-                    shape = CircleShape,
-                    color = colorPrimary.copy(alpha = 0.12f),
-                    border = BorderStroke(1.5.dp, colorPrimary.copy(alpha = 0.25f))
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (review.photoUrl.isNotBlank()) {
-                            SubcomposeAsyncImage(
-                                model = review.photoUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(44.dp).clip(CircleShape),
-                                error = {
-                                    Text(
-                                        text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = colorPrimary
-                                    )
-                                }
+                if (group.summary.imageUrl.isNotBlank()) {
+                    SubcomposeAsyncImage(
+                        model = group.summary.imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        error = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(colorPrimary.copy(alpha = 0.14f))
                             )
-                        } else {
+                        }
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(colorPrimary.copy(alpha = 0.14f))
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.44f))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = group.summary.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = group.summary.barName,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.9f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White.copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.32f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFC107),
+                                modifier = Modifier.size(14.dp)
+                            )
                             Text(
-                                text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                text = formatRating(group.summary.averageRating),
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = colorPrimary
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }
                 }
+            }
 
-                // Name + pintxo name
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = review.userName,
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = review.pintxoName,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = colorPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "${group.summary.ratingCount} valoraciones · ${group.reviews.size} reseñas",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colorOnSurfaceVariant
+                )
+
+                topReviews.forEach { review ->
+                    CommunityReviewRow(review = review)
                 }
 
-                // Star rating badge
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFFFC107).copy(alpha = 0.14f),
-                    border = BorderStroke(1.dp, Color(0xFFFFC107).copy(alpha = 0.4f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
+                if (group.reviews.size > topReviews.size) {
+                    Text(
+                        text = "+${group.reviews.size - topReviews.size} reseñas más",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colorPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommunityReviewRow(review: ReviewItem) {
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(36.dp),
+                shape = CircleShape,
+                color = colorPrimary.copy(alpha = 0.12f),
+                border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.24f))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (review.photoUrl.isNotBlank()) {
+                        SubcomposeAsyncImage(
+                            model = review.photoUrl,
                             contentDescription = null,
-                            tint = Color(0xFFFFC107),
-                            modifier = Modifier.size(14.dp)
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            error = {
+                                Text(
+                                    text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                    color = colorPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         )
+                    } else {
                         Text(
-                            text = "${review.stars}",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF8B6914)
+                            text = review.userName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                            color = colorPrimary,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
 
-            // Divider
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-            )
-
-            // Review text
-            Text(
-                text = review.text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colorOnSurfaceVariant,
-                lineHeight = 22.sp
-            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = review.userName,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = Color(0xFFFFC107),
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = review.stars.toString(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF8B6914),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                Text(
+                    text = review.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colorOnSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 20.sp
+                )
+            }
         }
     }
+}
+
+private fun formatRating(value: Double): String {
+    return String.format(Locale.US, "%.1f", value)
 }
