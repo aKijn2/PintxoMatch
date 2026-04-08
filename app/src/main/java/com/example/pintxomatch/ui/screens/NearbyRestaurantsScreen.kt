@@ -1482,11 +1482,14 @@ private suspend fun fetchNearbyRestaurants(
             val distanceMeters = properties.optInt("distance", -1)
             val address = properties.optString("address_line2", properties.optString("street"))
             
-            // Mapeo fácil de categorías a español
-            val rawCategory = properties.optJSONArray("categories")?.optString(0) ?: ""
+            // Mapeo fácil de categorías a español analizando toda la lista
+            val categoriesArray = properties.optJSONArray("categories")
+            val categoriesStr = categoriesArray?.toString() ?: ""
             val categoryLabel = when {
-                rawCategory.contains("bar") || rawCategory.contains("pub") -> "Bar / Pub"
-                rawCategory.contains("cafe") -> "Cafetería"
+                categoriesStr.contains("pub", ignoreCase = true) -> "Pub"
+                categoriesStr.contains("bar", ignoreCase = true) -> "Bar"
+                categoriesStr.contains("cafe", ignoreCase = true) -> "Cafetería"
+                categoriesStr.contains("restaurant", ignoreCase = true) -> "Restaurante"
                 else -> "Restaurante"
             }
 
