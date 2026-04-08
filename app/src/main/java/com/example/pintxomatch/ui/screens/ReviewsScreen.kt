@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,6 +28,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.ButtonDefaults
@@ -64,6 +66,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.pintxomatch.ui.components.ModernTopToast
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -128,6 +132,8 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     var isLoading by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
     var selectedSectionTab by remember { mutableStateOf(ReviewsSectionTab.Write) }
+    var communitySearchQuery by remember { mutableStateOf("") }
+    var expandedCommunityGroup by remember { mutableStateOf<PintxoCommunityGroup?>(null) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
 
     fun loadData() {
@@ -326,6 +332,17 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     }
     val communityGroups = remember(reviews, pintxosCommunity) {
         buildCommunityGroups(reviews = reviews, summaries = pintxosCommunity)
+    }
+    val filteredCommunityGroups = remember(communityGroups, communitySearchQuery) {
+        val query = communitySearchQuery.trim()
+        if (query.isBlank()) {
+            communityGroups
+        } else {
+            communityGroups.filter { group ->
+                group.summary.name.contains(query, ignoreCase = true) ||
+                    group.summary.barName.contains(query, ignoreCase = true)
+            }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -606,7 +623,25 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                         }
                     }
 
-                    if (communityGroups.isEmpty()) {
+                    item {
+                        OutlinedTextField(
+                            value = communitySearchQuery,
+                            onValueChange = { communitySearchQuery = it },
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+                            singleLine = true,
+                            label = { Text("Buscar pintxo") },
+                            placeholder = { Text("Nombre del pintxo o bar") },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = colorPrimary,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
+
+                    if (filteredCommunityGroups.isEmpty()) {
                         item {
                             Surface(
                                 modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
@@ -615,7 +650,11 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                                 border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f))
                             ) {
                                 Text(
-                                    text = "Todavía no hay reseñas de comunidad para mostrar.",
+                                    text = if (communitySearchQuery.isBlank()) {
+                                        "Todavía no hay reseñas de comunidad para mostrar."
+                                    } else {
+                                        "No hay pintxos que coincidan con tu búsqueda."
+                                    },
                                     modifier = Modifier.padding(18.dp),
                                     color = colorOnSurfaceVariant,
                                     style = MaterialTheme.typography.bodyMedium
@@ -623,9 +662,10 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                             }
                         }
                     } else {
-                        items(communityGroups) { group ->
+                        items(filteredCommunityGroups) { group ->
                             PintxoCommunityCard(
                                 group = group,
+                                onOpenDetails = { expandedCommunityGroup = group },
                                 modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp)
                             )
                         }
@@ -634,6 +674,13 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     }
                 }
             }
+        }
+
+        expandedCommunityGroup?.let { group ->
+            CommunityReviewsDialog(
+                group = group,
+                onDismiss = { expandedCommunityGroup = null }
+            )
         }
 
         ModernTopToast(
@@ -815,11 +862,12 @@ private fun ReviewStatChip(
 @Composable
 private fun PintxoCommunityCard(
     group: PintxoCommunityGroup,
+    onOpenDetails: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colorPrimary = MaterialTheme.colorScheme.primary
     val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val topReviews = group.reviews.take(3)
+    val topReviews = group.reviews.take(1)
 
     Surface(
         modifier = modifier,
@@ -858,6 +906,36 @@ private fun PintxoCommunityCard(
                             .fillMaxSize()
                             .background(colorPrimary.copy(alpha = 0.14f))
                     )
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 10.dp, top = 10.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onOpenDetails() },
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White.copy(alpha = 0.86f),
+                    border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.28f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "+",
+                            color = colorPrimary,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Ver más",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colorPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
 
                 Row(
@@ -928,16 +1006,6 @@ private fun PintxoCommunityCard(
 
                 topReviews.forEach { review ->
                     CommunityReviewRow(review = review)
-                }
-
-                if (group.reviews.size > topReviews.size) {
-                    Text(
-                        text = "+${group.reviews.size - topReviews.size} reseñas más",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = colorPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)
-                    )
                 }
             }
         }
@@ -1030,6 +1098,249 @@ private fun CommunityReviewRow(review: ReviewItem) {
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 20.sp
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommunityReviewsDialog(
+    group: PintxoCommunityGroup,
+    onDismiss: () -> Unit
+) {
+    var selectedPage by remember(group.summary.id) { mutableIntStateOf(0) }
+    val reviewsPerPage = 5
+    val pageCount = (group.reviews.size + reviewsPerPage - 1) / reviewsPerPage
+    val safePageCount = pageCount.coerceAtLeast(1)
+    val pageStart = selectedPage * reviewsPerPage
+    val pageReviews = group.reviews.drop(pageStart).take(reviewsPerPage)
+    val colorPrimary = MaterialTheme.colorScheme.primary
+    val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val canGoPrevious = selectedPage > 0
+    val canGoNext = selectedPage < safePageCount - 1
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f))
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 860.dp),
+                shape = RoundedCornerShape(26.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.18f)),
+                shadowElevation = 12.dp
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(168.dp)
+                            .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+                    ) {
+                        if (group.summary.imageUrl.isNotBlank()) {
+                            SubcomposeAsyncImage(
+                                model = group.summary.imageUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                                error = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(colorPrimary.copy(alpha = 0.14f))
+                                    )
+                                }
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(colorPrimary.copy(alpha = 0.14f))
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.28f))
+                        )
+
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp),
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.9f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.95f))
+                        ) {
+                            IconButton(onClick = onDismiss) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = "Cerrar",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .background(Color.Black.copy(alpha = 0.42f))
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = group.summary.name,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = group.summary.barName,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color.White.copy(alpha = 0.2f),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Star,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFFC107),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = formatRating(group.summary.averageRating),
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "${group.summary.ratingCount} valoraciones · ${group.reviews.size} reseñas",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colorOnSurfaceVariant
+                        )
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp, max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(pageReviews) { review ->
+                            CommunityReviewRow(review = review)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable(enabled = canGoPrevious) {
+                                    if (canGoPrevious) selectedPage -= 1
+                                },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (canGoPrevious) colorPrimary.copy(alpha = 0.10f) else colorOnSurfaceVariant.copy(alpha = 0.09f),
+                            border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.20f))
+                        ) {
+                            Text(
+                                text = "Anterior",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                color = if (canGoPrevious) colorPrimary else colorOnSurfaceVariant,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            repeat(safePageCount) { pageIndex ->
+                                val selected = pageIndex == selectedPage
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { selectedPage = pageIndex },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (selected) colorPrimary else colorPrimary.copy(alpha = 0.10f),
+                                    border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.25f))
+                                ) {
+                                    Text(
+                                        text = (pageIndex + 1).toString(),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimary else colorPrimary,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable(enabled = canGoNext) {
+                                    if (canGoNext) selectedPage += 1
+                                },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (canGoNext) colorPrimary.copy(alpha = 0.10f) else colorOnSurfaceVariant.copy(alpha = 0.09f),
+                            border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.20f))
+                        ) {
+                            Text(
+                                text = "Siguiente",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                color = if (canGoNext) colorPrimary else colorOnSurfaceVariant,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    }
+                }
             }
         }
     }
