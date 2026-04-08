@@ -58,7 +58,7 @@ Food View X combines immersive vertical browsing, local food discovery, and soci
 | Backend | Firebase Auth, Cloud Firestore, Realtime Database |
 | Media | Local Image Server (Docker) + Cloudinary mode |
 | Image Loading | Coil |
-| Maps | osmdroid + external routing intents |
+| Maps & Places | osmdroid + Geoapify (Places API) + external routing intents |
 | Build | Gradle Kotlin DSL |
 
 ## Architecture Snapshot

@@ -1436,90 +1436,95 @@ private suspend fun fetchNearbyRestaurants(
     longitude: Double,
     radiusMeters: Int
 ): List<NearbyRestaurant> = withContext(Dispatchers.IO) {
-    val query = """
-        [out:json][timeout:12];
-        nwr["amenity"~"restaurant|bar|pub|cafe"]["name"](around:$radiusMeters,$latitude,$longitude);
-        out tags center qt;
-    """.trimIndent()
 
-    val response = requestOverpass(query)
-    val normalizedResponse = response.trimStart()
-    if (!normalizedResponse.startsWith("{")) {
-        val preview = normalizedResponse.take(120).replace('\n', ' ')
-        throw NearbyRestaurantsException(
-            if (preview.isBlank()) {
-                "El servicio de restaurantes devolvió una respuesta vacía"
-            } else {
-                "El servicio de restaurantes devolvió una respuesta no válida: $preview"
+    // API Key de Geoapify (Obtenida satisfactoriamente)
+    val apiKey = "7e67ac55037f48288c5074eed9d3a424" 
+
+    val categories = "catering.restaurant,catering.cafe,catering.bar,catering.pub"
+    val filter = "circle:$longitude,$latitude,$radiusMeters"
+    val url = "https://api.geoapify.com/v2/places?categories=$categories&filter=$filter&limit=25&apiKey=$apiKey"
+
+    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 5000
+        readTimeout = 5000
+        setRequestProperty("Accept", "application/json")
+        setRequestProperty("User-Agent", "FoodViewX-App/1.0 (contacto@foodviewx.com) PintxoMatch")
+    }
+
+    try {
+        val statusCode = connection.responseCode
+        if (statusCode !in 200..299) {
+            throw NearbyRestaurantsException("Error $statusCode de Geoapify: El servicio rechazó la consulta.")
+        }
+
+        val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        val json = try {
+            JSONObject(body)
+        } catch (e: JSONException) {
+            throw NearbyRestaurantsException("Respuesta ilegible del servidor de lugares.")
+        }
+
+        val features = json.getJSONArray("features")
+        val results = mutableListOf<NearbyRestaurant>()
+
+        for (index in 0 until features.length()) {
+            val feature = features.getJSONObject(index)
+            val properties = feature.optJSONObject("properties") ?: continue
+            
+            val name = properties.optString("name")
+            if (name.isBlank()) continue
+
+            val lat = properties.optDouble("lat", Double.NaN)
+            val lon = properties.optDouble("lon", Double.NaN)
+            if (lat.isNaN() || lon.isNaN()) continue
+
+            val distanceMeters = properties.optInt("distance", -1)
+            val address = properties.optString("address_line2", properties.optString("street"))
+            
+            // Mapeo fácil de categorías a español
+            val rawCategory = properties.optJSONArray("categories")?.optString(0) ?: ""
+            val categoryLabel = when {
+                rawCategory.contains("bar") || rawCategory.contains("pub") -> "Bar / Pub"
+                rawCategory.contains("cafe") -> "Cafetería"
+                else -> "Restaurante"
             }
-        )
-    }
 
-    val json = try {
-        JSONObject(normalizedResponse)
-    } catch (exception: JSONException) {
-        throw NearbyRestaurantsException("No pudimos interpretar la respuesta del servicio de restaurantes")
-    }
-    val elements = json.getJSONArray("elements")
-    val results = mutableListOf<NearbyRestaurant>()
-
-    for (index in 0 until elements.length()) {
-        val element = elements.getJSONObject(index)
-        val tags = element.optJSONObject("tags") ?: continue
-        val name = tags.optString("name")
-        if (name.isBlank()) continue
-        val lat = when {
-            element.has("lat") -> element.optDouble("lat")
-            element.has("center") -> element.getJSONObject("center").optDouble("lat")
-            else -> Double.NaN
-        }
-        val lon = when {
-            element.has("lon") -> element.optDouble("lon")
-            element.has("center") -> element.getJSONObject("center").optDouble("lon")
-            else -> Double.NaN
-        }
-
-        if (lat.isNaN() || lon.isNaN()) continue
-
-        val distance = FloatArray(1)
-        Location.distanceBetween(latitude, longitude, lat, lon, distance)
-        val addressParts = listOf(
-            tags.optString("addr:street"),
-            tags.optString("addr:housenumber")
-        ).filter { it.isNotBlank() }
-
-        val category = when (tags.optString("amenity")) {
-            "restaurant" -> "Restaurante"
-            "bar" -> "Bar"
-            "pub" -> "Pub"
-            "cafe" -> "Cafetería"
-            else -> "Local"
-        }
-
-        results.add(
-            NearbyRestaurant(
-                id = "${element.optString("type")}_${element.optLong("id")}",
-                name = name,
-                category = category,
-                address = addressParts.joinToString(" "),
-                latitude = lat,
-                longitude = lon,
-                distanceMeters = distance[0].toInt()
+            results.add(
+                NearbyRestaurant(
+                    id = properties.optString("place_id", "geoapify_$index"),
+                    name = name,
+                    category = categoryLabel,
+                    address = address,
+                    latitude = lat,
+                    longitude = lon,
+                    distanceMeters = if (distanceMeters >= 0) distanceMeters else 0 // Geoapify ya da la distancia!
+                )
             )
-        )
-    }
+        }
 
-    results
-        .distinctBy { it.id }
-        .sortedBy { it.distanceMeters }
-        .take(20)
+        results
+            .distinctBy { it.id }
+            .sortedBy { it.distanceMeters }
+
+    } catch (exception: Exception) {
+        val msg = exception.message.orEmpty()
+        if (exception is java.net.SocketTimeoutException) {
+            throw NearbyRestaurantsException("El nuevo servidor de mapas está tardando también. Revisa tu conexión.")
+        } else {
+            throw NearbyRestaurantsException(exception.message ?: "Error al contactar con la API de lugares rápidos.")
+        }
+    } finally {
+        connection.disconnect()
+    }
 }
 
 private fun requestOverpass(query: String): String {
     val endpoints = listOf(
         "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+        "https://lz4.overpass-api.de/api/interpreter",
+        "https://z.overpass-api.de/api/interpreter",
+        "https://overpass.openstreetmap.fr/api/interpreter"
     )
 
     var lastError: String? = null
@@ -1534,7 +1539,7 @@ private fun requestOverpass(query: String): String {
                 doOutput = true
                 setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
                 setRequestProperty("Accept", "application/json")
-                setRequestProperty("User-Agent", "PintxoMatch/1.0")
+                setRequestProperty("User-Agent", "FoodViewX-App/1.0 (contacto@foodviewx.com) PintxoMatch")
             }
 
             connection.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
@@ -1556,19 +1561,35 @@ private fun requestOverpass(query: String): String {
             }
 
             lastError = when (statusCode) {
+                403 -> "El acceso a los mapas está temporalmente bloqueado (403). Por favor, inténtalo de nuevo más tarde."
                 429 -> "El servicio de mapas está saturado ahora mismo. Prueba otra vez en unos segundos."
                 in 500..599 -> "El servicio de restaurantes cercanos no responde bien en este momento."
                 else -> {
-                    val preview = body.trim().take(120).replace('\n', ' ')
-                    if (preview.isBlank()) {
-                        "No pudimos consultar restaurantes cercanos ahora mismo."
+                    val bodyText = body.orEmpty()
+                    if (bodyText.contains("<html", ignoreCase = true) || bodyText.contains("<body", ignoreCase = true)) {
+                        "El servidor devolvió una página web inesperada en lugar de datos (HTTP $statusCode)."
                     } else {
-                        "Respuesta no válida del servicio de restaurantes: $preview"
+                        val preview = bodyText.trim().take(120).replace('\n', ' ')
+                        if (preview.isBlank()) {
+                            "No pudimos consultar restaurantes cercanos ahora mismo."
+                        } else {
+                            "Respuesta HTTP $statusCode. Detalles: $preview"
+                        }
                     }
                 }
             }
         } catch (exception: Exception) {
-            lastError = exception.message ?: "Fallo de red consultando locales cercanos"
+            val msg = exception.message.orEmpty()
+            lastError = when (exception) {
+                is java.net.SocketTimeoutException -> "El servidor de mapas está tardando demasiado en responder."
+                is java.net.UnknownHostException -> "No hay conexión o el servidor no se encuentra."
+                is java.net.ConnectException -> "No se pudo conectar al servidor de mapas."
+                else -> if (msg.contains("timeout", ignoreCase = true) || msg.contains("failed to connect", ignoreCase = true)) {
+                    "Tiempo de espera agotado al consultar los mapas."
+                } else {
+                    "Fallo de red consultando locales: $msg"
+                }
+            }
         }
     }
 

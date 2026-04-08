@@ -2,6 +2,17 @@
 
 ---
 
+## 2026-04-08 — Migración de Overpass a Geoapify (Cerca de ti)
+
+Se ha reemplazado la integración de OpenStreetMap Overpass API (que presentaba bloqueos por IP, respuestas 403 Forbidden y altos tiempos de respuesta) por la **Geoapify Places API** en la sección de "Cerca de ti".
+
+- Elimina timeouts de >8 segundos al interactuar con el mapa.
+- Previene bloqueos por rate limiting y devoluciones de HTML en lugar de JSON al cambiar radíos de búsqueda rápidamente (ej. 1 km a 3 km).
+- Procesamiento del GeoJSON asíncrono y nativo en `NearbyRestaurantsScreen.kt`.
+- Simplificación del mapeo de categorías directas (Bares, Pubs, Cafeterías y Restaurantes).
+
+---
+
 ## 2026-04-01 — Retención y Gamificación básica (completado)
 
 Se ha implementado un primer sistema de retención para aumentar recurrencia semanal:
