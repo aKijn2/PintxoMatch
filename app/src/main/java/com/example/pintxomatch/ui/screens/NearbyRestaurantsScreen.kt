@@ -11,6 +11,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import android.view.MotionEvent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -35,6 +36,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,6 +56,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -156,6 +161,11 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
     var hasLocationPermission by remember { mutableStateOf(context.hasLocationPermission()) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
     var selectedCategory by remember { mutableStateOf("Todos") }
+    var isMapMaximized by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = isMapMaximized) {
+        isMapMaximized = false
+    }
 
     val availableCategories = remember(restaurants) {
         listOf("Todos") + restaurants
@@ -255,54 +265,96 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Cerca de ti") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            if (hasLocationPermission) {
-                                requestCurrentLocation(
-                                    context = context,
-                                    locationManager = locationManager,
-                                    onLoadingChanged = { isLocationLoading = it },
-                                    onLocationFound = { userLocation = it },
-                                    onError = { alertMessage = it }
-                                )
-                            } else {
-                                permissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
-                            }
+            if (!isMapMaximized) {
+                TopAppBar(
+                    title = { Text("Cerca de ti") },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
                         }
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Recargar")
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                if (hasLocationPermission) {
+                                    requestCurrentLocation(
+                                        context = context,
+                                        locationManager = locationManager,
+                                        onLoadingChanged = { isLocationLoading = it },
+                                        onLocationFound = { userLocation = it },
+                                        onError = { alertMessage = it }
+                                    )
+                                } else {
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Recargar")
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(if (isMapMaximized) PaddingValues(0.dp) else padding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                if (!hasLocationPermission) {
+            if (isMapMaximized) {
+                MapStageCard(
+                    modifier = Modifier.fillMaxSize(),
+                    isMaximized = true,
+                    onToggleMaximize = { isMapMaximized = false },
+                    userLocation = userLocation,
+                    restaurants = filteredRestaurants,
+                    totalResults = filteredRestaurants.size,
+                    radiusLabel = formatRadiusLabel(selectedRadius),
+                    selectedRestaurant = selectedRestaurant,
+                    selectedRestaurantId = restaurantMapSelection?.restaurantId,
+                    centerOnRestaurantId = restaurantMapSelection?.takeIf { it.centerMapOnSelection }?.restaurantId,
+                    isLoading = isLocationLoading || isPlacesLoading,
+                    onRestaurantSelected = { restaurant ->
+                        selectedRestaurant = restaurant
+                        restaurantMapSelection = RestaurantMapSelection(
+                            restaurantId = restaurant.id,
+                            centerMapOnSelection = false
+                        )
+                    },
+                    onCenteredSelectionHandled = {
+                        restaurantMapSelection = restaurantMapSelection?.copy(centerMapOnSelection = false)
+                    },
+                    onSelectOnMap = { restaurant ->
+                        selectedRestaurant = restaurant
+                        restaurantMapSelection = RestaurantMapSelection(
+                            restaurantId = restaurant.id,
+                            centerMapOnSelection = true
+                        )
+                    },
+                    onOpenDirections = { restaurant ->
+                        selectedRestaurant = restaurant
+                        openDirections(
+                            context = context,
+                            restaurant = restaurant,
+                            userLocation = userLocation
+                        )
+                    }
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (!hasLocationPermission) {
                     DiscoveryControlPanel(
                         userLocation = userLocation,
                         selectedRadius = selectedRadius,
@@ -354,6 +406,9 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
                     )
 
                     MapStageCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        isMaximized = false,
+                        onToggleMaximize = { isMapMaximized = true },
                         userLocation = userLocation,
                         restaurants = filteredRestaurants,
                         totalResults = filteredRestaurants.size,
@@ -428,7 +483,8 @@ fun NearbyRestaurantsScreen(onNavigateBack: () -> Unit) {
                         }
                     }
                 }
-            }
+            } // Close Column
+            } // Close else branch of isMapMaximized
 
             ModernTopToast(
                 message = alertMessage,
@@ -597,6 +653,9 @@ private fun DiscoveryControlPanel(
 
 @Composable
 private fun MapStageCard(
+    modifier: Modifier = Modifier,
+    isMaximized: Boolean,
+    onToggleMaximize: () -> Unit,
     userLocation: GeoPoint?,
     restaurants: List<NearbyRestaurant>,
     totalResults: Int,
@@ -633,38 +692,60 @@ private fun MapStageCard(
         }
     }
     Card(
-        shape = RoundedCornerShape(32.dp),
+        modifier = modifier,
+        shape = RoundedCornerShape(if (isMaximized) 0.dp else 32.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
-            modifier = Modifier.padding(top = 24.dp, bottom = 20.dp, start = 20.dp, end = 20.dp),
+            modifier = Modifier
+                .then(if (isMaximized) Modifier.systemBarsPadding() else Modifier)
+                .padding(if (isMaximized) 12.dp else 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "TU MAPA",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelMedium,
-                    letterSpacing = 1.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "A un simple vistazo",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 24.sp,
-                    lineHeight = 28.sp
-                )
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer
-                ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "$totalResults ${if (totalResults == 1) "lugar" else "lugares"}",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        text = "TU MAPA",
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelMedium,
+                        letterSpacing = 1.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "A un simple vistazo",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 24.sp,
+                        lineHeight = 28.sp
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Text(
+                            text = "$totalResults ${if (totalResults == 1) "lugar" else "lugares"}",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    modifier = Modifier.clickable(onClick = onToggleMaximize)
+                ) {
+                    Icon(
+                        imageVector = if (isMaximized) Icons.Default.Close else Icons.Default.Add,
+                        contentDescription = if (isMaximized) "Minimizar" else "Ampliar",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(12.dp).size(28.dp)
                     )
                 }
             }
@@ -673,6 +754,7 @@ private fun MapStageCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f, fill = false)
                         .height(340.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -697,9 +779,7 @@ private fun MapStageCard(
                 }
 
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(340.dp),
+                    modifier = if (isMaximized) Modifier.weight(1f).fillMaxWidth() else Modifier.fillMaxWidth().height(340.dp),
                     shape = RoundedCornerShape(24.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     colors = CardDefaults.cardColors(
@@ -807,16 +887,32 @@ private fun MapStageCard(
                                 )
                             }
                         }
+
+                        if (isMaximized) {
+                            selectedRestaurant?.let { restaurant ->
+                                MiniSelectedRestaurantOverlay(
+                                    restaurant = restaurant,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 24.dp, start = 16.dp, end = 16.dp)
+                                        .fillMaxWidth(),
+                                    onSelectOnMap = { onSelectOnMap(restaurant) },
+                                    onOpenDirections = { onOpenDirections(restaurant) }
+                                )
+                            }
+                        }
                     }
                 }
 
-                selectedRestaurant?.let { restaurant ->
-                    MiniSelectedRestaurantOverlay(
-                        restaurant = restaurant,
-                        modifier = Modifier.fillMaxWidth(),
-                        onSelectOnMap = { onSelectOnMap(restaurant) },
-                        onOpenDirections = { onOpenDirections(restaurant) }
-                    )
+                if (!isMaximized) {
+                    selectedRestaurant?.let { restaurant ->
+                        MiniSelectedRestaurantOverlay(
+                            restaurant = restaurant,
+                            modifier = Modifier.fillMaxWidth(),
+                            onSelectOnMap = { onSelectOnMap(restaurant) },
+                            onOpenDirections = { onOpenDirections(restaurant) }
+                        )
+                    }
                 }
             }
         }
