@@ -853,6 +853,7 @@ private fun MapStageCard(
                                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                                         icon = buildRestaurantMarkerDrawable(
                                             context = context,
+                                            restaurant = restaurant,
                                             isSelected = restaurant.id == mapSelectedRestaurant?.id,
                                             primaryColor = primaryColorArgb
                                         )
@@ -1377,20 +1378,41 @@ private fun CategoryChip(text: String) {
 
 private fun buildRestaurantMarkerDrawable(
     context: Context,
+    restaurant: NearbyRestaurant,
     isSelected: Boolean,
     primaryColor: Int
-): GradientDrawable {
-    return GradientDrawable().apply {
+): android.graphics.drawable.Drawable {
+    val markerSizePx = if (isSelected) dpToPx(context, 44) else dpToPx(context, 36)
+    val strokeWidthPx = if (isSelected) dpToPx(context, 6) else dpToPx(context, 3)
+
+    val background = GradientDrawable().apply {
         shape = GradientDrawable.OVAL
-        val markerSizePx = if (isSelected) dpToPx(context, 44) else dpToPx(context, 36)
-        val strokeWidthPx = if (isSelected) dpToPx(context, 6) else dpToPx(context, 3)
-        setSize(
-            markerSizePx,
-            markerSizePx
-        )
+        setSize(markerSizePx, markerSizePx)
         setColor(if (isSelected) primaryColor else android.graphics.Color.WHITE)
         setStroke(strokeWidthPx, primaryColor)
     }
+
+    val iconResId = when (normalizeRestaurantCategory(restaurant.category)) {
+        "Restaurante", "Restaurantes" -> com.example.pintxomatch.R.drawable.ic_map_restaurant
+        "Bar", "Bares" -> com.example.pintxomatch.R.drawable.ic_map_bar
+        "Pub", "Pubs" -> com.example.pintxomatch.R.drawable.ic_map_pub
+        "Cafetería", "Cafeterías" -> com.example.pintxomatch.R.drawable.ic_map_cafe
+        "Comida Rápida" -> com.example.pintxomatch.R.drawable.ic_map_fastfood
+        else -> null
+    }
+
+    if (iconResId != null) {
+        val iconDrawable = ContextCompat.getDrawable(context, iconResId)?.mutate()
+        if (iconDrawable != null) {
+            iconDrawable.setTint(if (isSelected) android.graphics.Color.WHITE else primaryColor)
+            val layerDrawable = android.graphics.drawable.LayerDrawable(arrayOf(background, iconDrawable))
+            val padding = if (isSelected) dpToPx(context, 10) else dpToPx(context, 8)
+            layerDrawable.setLayerInset(1, padding, padding, padding, padding)
+            return layerDrawable
+        }
+    }
+
+    return background
 }
 
 private fun openDirections(
@@ -1620,83 +1642,6 @@ private suspend fun fetchNearbyRestaurants(
     } finally {
         connection.disconnect()
     }
-}
-
-private fun requestOverpass(query: String): String {
-    val endpoints = listOf(
-        "https://overpass-api.de/api/interpreter",
-        "https://lz4.overpass-api.de/api/interpreter",
-        "https://z.overpass-api.de/api/interpreter",
-        "https://overpass.openstreetmap.fr/api/interpreter"
-    )
-
-    var lastError: String? = null
-    val requestBody = "data=${URLEncoder.encode(query, Charsets.UTF_8.name())}"
-
-    for (endpoint in endpoints) {
-        try {
-            val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = 8000
-                readTimeout = 12000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("User-Agent", "FoodViewX-App/1.0 (contacto@foodviewx.com) PintxoMatch")
-            }
-
-            connection.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
-                writer.write(requestBody)
-            }
-
-            val statusCode = connection.responseCode
-            val stream = if (statusCode in 200..299) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            connection.disconnect()
-
-            if (statusCode in 200..299 && body.isNotBlank()) {
-                return body
-            }
-
-            lastError = when (statusCode) {
-                403 -> "El acceso a los mapas está temporalmente bloqueado (403). Por favor, inténtalo de nuevo más tarde."
-                429 -> "El servicio de mapas está saturado ahora mismo. Prueba otra vez en unos segundos."
-                in 500..599 -> "El servicio de restaurantes cercanos no responde bien en este momento."
-                else -> {
-                    val bodyText = body.orEmpty()
-                    if (bodyText.contains("<html", ignoreCase = true) || bodyText.contains("<body", ignoreCase = true)) {
-                        "El servidor devolvió una página web inesperada en lugar de datos (HTTP $statusCode)."
-                    } else {
-                        val preview = bodyText.trim().take(120).replace('\n', ' ')
-                        if (preview.isBlank()) {
-                            "No pudimos consultar restaurantes cercanos ahora mismo."
-                        } else {
-                            "Respuesta HTTP $statusCode. Detalles: $preview"
-                        }
-                    }
-                }
-            }
-        } catch (exception: Exception) {
-            val msg = exception.message.orEmpty()
-            lastError = when (exception) {
-                is java.net.SocketTimeoutException -> "El servidor de mapas está tardando demasiado en responder."
-                is java.net.UnknownHostException -> "No hay conexión o el servidor no se encuentra."
-                is java.net.ConnectException -> "No se pudo conectar al servidor de mapas."
-                else -> if (msg.contains("timeout", ignoreCase = true) || msg.contains("failed to connect", ignoreCase = true)) {
-                    "Tiempo de espera agotado al consultar los mapas."
-                } else {
-                    "Fallo de red consultando locales: $msg"
-                }
-            }
-        }
-    }
-
-    throw NearbyRestaurantsException(lastError ?: "No pudimos consultar restaurantes cercanos ahora mismo")
 }
 
 private fun formatDistance(distanceMeters: Int): String {
