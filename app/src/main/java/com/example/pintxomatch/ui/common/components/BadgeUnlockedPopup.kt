@@ -1,5 +1,4 @@
 package com.example.pintxomatch.ui.common.components
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -35,6 +34,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +51,7 @@ fun BadgeUnlockedPopup(
     modifier: Modifier = Modifier,
     autoDismissMillis: Long = 2300L
 ) {
+    val context = LocalContext.current
     val density = LocalDensity.current
     val overlayAlpha = remember { Animatable(0f) }
     val trophyOffsetX = remember { Animatable(0f) }
@@ -82,6 +83,7 @@ fun BadgeUnlockedPopup(
                 LaunchedEffect(badgeId, widthPx) {
                     if (badgeId.isBlank() || widthPx <= 0f) return@LaunchedEffect
 
+                    triggerAchievementVibration(context)
                     textVisible = false
                     overlayAlpha.snapTo(0f)
                     contentAlpha.snapTo(1f)

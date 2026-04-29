@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +57,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.pintxomatch.ui.common.components.toBadgeDisplayLabel
 import com.example.pintxomatch.ui.common.components.toUniqueBadgeDisplayLabels
+import com.example.pintxomatch.ui.common.components.triggerAchievementVibration
 import com.example.pintxomatch.ui.gamification.WeeklyChallengeUiItem
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -276,6 +278,7 @@ private fun DebugTrophySequenceOverlay(
     badgeName: String,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val density = LocalDensity.current
     val overlayAlpha = remember { Animatable(0f) }
     val trophyOffsetX = remember { Animatable(0f) }
@@ -307,6 +310,7 @@ private fun DebugTrophySequenceOverlay(
                 LaunchedEffect(trigger, widthPx) {
                     if (trigger <= 0 || widthPx <= 0f) return@LaunchedEffect
 
+                    triggerAchievementVibration(context)
                     textVisible = false
                     overlayAlpha.snapTo(0f)
                     contentAlpha.snapTo(1f)
