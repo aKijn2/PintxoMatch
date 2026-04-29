@@ -8,8 +8,9 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $composeFile = Join-Path $repoRoot "docker-compose.image-server.yml"
 $localPropertiesPath = Join-Path $repoRoot "local.properties"
 $tunnelInfoPath = Join-Path $repoRoot "scripts\.cloudflare-tunnel.json"
-$cloudflaredLogPath = Join-Path $env:TEMP "pintxomatch-cloudflared.log"
-$cloudflaredErrLogPath = Join-Path $env:TEMP "pintxomatch-cloudflared.err.log"
+$runStamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$cloudflaredLogPath = Join-Path $env:TEMP "pintxomatch-cloudflared-$runStamp.log"
+$cloudflaredErrLogPath = Join-Path $env:TEMP "pintxomatch-cloudflared-$runStamp.err.log"
 
 function Assert-Command {
     param([string]$Name)
@@ -105,6 +106,49 @@ function Wait-ForHealth {
     throw "Timed out waiting for health endpoint: $Uri"
 }
 
+function Get-PropertyValue {
+    param(
+        [string]$FilePath,
+        [string]$Key
+    )
+
+    if (-not (Test-Path $FilePath)) {
+        return $null
+    }
+
+    $pattern = "(?m)^" + [Regex]::Escape($Key) + "=(.*)$"
+    $content = Get-Content -Path $FilePath -Raw -ErrorAction SilentlyContinue
+    $match = [Regex]::Match($content, $pattern)
+    if ($match.Success) {
+        return $match.Groups[1].Value.Trim()
+    }
+
+    return $null
+}
+
+function Stop-PreviousTunnel {
+    param([string]$TunnelInfoFilePath)
+
+    if (-not (Test-Path $TunnelInfoFilePath)) {
+        return
+    }
+
+    try {
+        $info = Get-Content -Path $TunnelInfoFilePath -Raw | ConvertFrom-Json
+        $pid = $info.cloudflaredPid
+        if ($pid) {
+            $process = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            if ($process) {
+                Stop-Process -Id $pid -Force -ErrorAction Stop
+                Write-Host "Stopped previous Cloudflare tunnel PID $pid"
+            }
+        }
+    }
+    catch {
+        Write-Warning "Could not stop previous Cloudflare tunnel from $TunnelInfoFilePath"
+    }
+}
+
 try {
     Assert-Command -Name "docker"
     Assert-Command -Name "cloudflared"
@@ -116,28 +160,31 @@ try {
     Write-Host "Starting image server container..."
     docker compose -f $composeFile up -d | Out-Null
 
-    if (Test-Path $cloudflaredLogPath) {
-        Remove-Item $cloudflaredLogPath -Force
-    }
-
-    if (Test-Path $cloudflaredErrLogPath) {
-        Remove-Item $cloudflaredErrLogPath -Force
-    }
+    $previousLocalImageBaseUrl = Get-PropertyValue -FilePath $localPropertiesPath -Key "LOCAL_IMAGE_BASE_URL"
+    Stop-PreviousTunnel -TunnelInfoFilePath $tunnelInfoPath
 
     Write-Host "Starting Cloudflare tunnel..."
-    $cloudflaredProcess = Start-Process -FilePath "cloudflared" -ArgumentList "tunnel --url http://localhost:8080" -RedirectStandardOutput $cloudflaredLogPath -RedirectStandardError $cloudflaredErrLogPath -PassThru
+    $cloudflaredArgs = @(
+        "tunnel"
+        "--protocol"
+        "http2"
+        "--url"
+        "http://localhost:8080"
+    )
+    $cloudflaredProcess = Start-Process -FilePath "cloudflared" -ArgumentList $cloudflaredArgs -RedirectStandardOutput $cloudflaredLogPath -RedirectStandardError $cloudflaredErrLogPath -PassThru
 
     $tunnelUrl = Wait-ForTunnelUrl -OutLogPath $cloudflaredLogPath -ErrLogPath $cloudflaredErrLogPath -TimeoutSeconds $TunnelTimeoutSeconds
 
     Write-Host "Tunnel URL detected: $tunnelUrl"
-
-    Set-Or-AppendProperty -FilePath $localPropertiesPath -Key "LOCAL_IMAGE_BASE_URL" -Value $tunnelUrl
 
     $env:PUBLIC_BASE_URL = $tunnelUrl
     Write-Host "Recreating image server with updated PUBLIC_BASE_URL..."
     docker compose -f $composeFile up -d --force-recreate | Out-Null
 
     $health = Wait-ForHealth -Uri "http://localhost:8080/health" -TimeoutSeconds 40
+    $publicHealth = Wait-ForHealth -Uri "$tunnelUrl/health" -TimeoutSeconds 40
+
+    Set-Or-AppendProperty -FilePath $localPropertiesPath -Key "LOCAL_IMAGE_BASE_URL" -Value $tunnelUrl
 
     @{
         tunnelUrl = $tunnelUrl
@@ -152,6 +199,7 @@ try {
     Write-Host "- LOCAL_IMAGE_BASE_URL updated in local.properties"
     Write-Host "- PUBLIC_BASE_URL set in image server container"
     Write-Host "- Health check: $($health.status)"
+    Write-Host "- Public health check: $($publicHealth.status)"
     Write-Host "- cloudflared PID: $($cloudflaredProcess.Id)"
     Write-Host "- Log file: $cloudflaredLogPath"
     Write-Host "- Error log file: $cloudflaredErrLogPath"
@@ -159,6 +207,9 @@ try {
     Write-Host "Rebuild and run your Android app now so BuildConfig picks up the latest URL."
 }
 catch {
+    if ($previousLocalImageBaseUrl) {
+        Set-Or-AppendProperty -FilePath $localPropertiesPath -Key "LOCAL_IMAGE_BASE_URL" -Value $previousLocalImageBaseUrl
+    }
     Write-Error $_
     exit 1
 }
