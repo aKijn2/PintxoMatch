@@ -115,8 +115,8 @@ class GamificationRepository(
 
     override suspend fun upsertDefaultWeeklyChallengesForCurrentWeek(now: Long) {
         val weekId = buildWeekId(now)
-        val startsAt = now
-        val endsAt = now + MILLIS_IN_WEEK
+        val startsAt = startOfWeekMillis(now)
+        val endsAt = startsAt + MILLIS_IN_WEEK - 1L
 
         val defaults = listOf(
             mapOf(
@@ -261,6 +261,7 @@ class GamificationRepository(
     }
 
     private suspend fun getActiveWeeklyChallenges(now: Long): List<WeeklyChallenge> {
+        val currentWeekId = buildWeekId(now)
         val snapshot = challengesCollection
             .whereEqualTo("isActive", true)
             .get()
@@ -269,15 +270,32 @@ class GamificationRepository(
         return snapshot.documents
             .mapNotNull { it.toWeeklyChallengeOrNull() }
             .filter { challenge ->
-                now in challenge.startsAt..challenge.endsAt
+                challenge.weekId == currentWeekId && now in challenge.startsAt..challenge.endsAt
             }
             .sortedBy { it.targetCount }
     }
 
     private fun buildWeekId(now: Long): String {
-        val calendar = Calendar.getInstance().apply { timeInMillis = now }
+        val calendar = Calendar.getInstance().apply {
+            firstDayOfWeek = Calendar.MONDAY
+            minimalDaysInFirstWeek = 4
+            timeInMillis = now
+        }
         val year = calendar.get(Calendar.YEAR)
         val week = calendar.get(Calendar.WEEK_OF_YEAR)
         return String.format(Locale.US, "%04d-W%02d", year, week)
+    }
+
+    private fun startOfWeekMillis(now: Long): Long {
+        return Calendar.getInstance().apply {
+            firstDayOfWeek = Calendar.MONDAY
+            minimalDaysInFirstWeek = 4
+            timeInMillis = now
+            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
 }

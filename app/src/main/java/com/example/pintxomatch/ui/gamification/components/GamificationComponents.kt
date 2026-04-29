@@ -54,6 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.pintxomatch.ui.common.components.toBadgeDisplayLabel
+import com.example.pintxomatch.ui.common.components.toUniqueBadgeDisplayLabels
 import com.example.pintxomatch.ui.gamification.WeeklyChallengeUiItem
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -152,8 +154,8 @@ fun GamificationProfileSection(
                     )
                 } else {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(badges) { badgeId ->
-                            BadgePill(label = prettifyBadgeName(badgeId))
+                        items(badges.toUniqueBadgeDisplayLabels()) { badgeLabel ->
+                            BadgePill(label = badgeLabel)
                         }
                     }
                 }
@@ -163,7 +165,7 @@ fun GamificationProfileSection(
 
     DebugTrophySequenceOverlay(
         trigger = debugSequenceTrigger,
-        badgeName = "Critic",
+        badgeName = "Critico",
         modifier = Modifier.fillMaxSize()
     )
 }
@@ -394,7 +396,7 @@ private fun DebugTrophySequenceOverlay(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Text(
-                                    text = "NUEVA INSIGNIA!",
+                                    text = "NUEVO TROFEO",
                                     color = Color.White,
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         shadow = Shadow(
@@ -407,7 +409,7 @@ private fun DebugTrophySequenceOverlay(
                                     textAlign = TextAlign.Center
                                 )
                                 Text(
-                                    text = badgeName.toBadgeDisplayName(),
+                                    text = badgeName.toBadgeDisplayLabel(),
                                     color = Color.White,
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         shadow = Shadow(
@@ -428,16 +430,9 @@ private fun DebugTrophySequenceOverlay(
     }
 }
 
-private fun prettifyBadgeName(badgeId: String): String {
-    return badgeId
-        .substringAfterLast('_')
-        .replace('-', ' ')
-        .uppercase()
-}
-
 private fun String.toBadgeDisplayName(): String {
     val normalized = this.trim()
-    if (normalized.isEmpty()) return "Critic"
+    if (normalized.isEmpty()) return "Critico"
     val lower = normalized.lowercase(Locale.getDefault())
     return lower.replaceFirstChar { it.titlecase(Locale.getDefault()) }
 }

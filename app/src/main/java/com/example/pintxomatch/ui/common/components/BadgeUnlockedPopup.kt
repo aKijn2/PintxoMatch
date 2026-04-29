@@ -1,41 +1,46 @@
 package com.example.pintxomatch.ui.common.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
 
 @Composable
@@ -46,115 +51,150 @@ fun BadgeUnlockedPopup(
     modifier: Modifier = Modifier,
     autoDismissMillis: Long = 2300L
 ) {
-    val glow = rememberInfiniteTransition(label = "badge_glow")
-    val glowAlpha = glow.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.75f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "badge_glow_alpha"
-    )
+    val density = LocalDensity.current
+    val overlayAlpha = remember { Animatable(0f) }
+    val trophyOffsetX = remember { Animatable(0f) }
+    val contentAlpha = remember { Animatable(0f) }
+    var textVisible by remember { mutableStateOf(false) }
+    var internalVisible by remember { mutableStateOf(false) }
+    val badgeLabel = badgeId.toBadgeDisplayLabel()
 
     LaunchedEffect(visible, badgeId) {
-        if (visible) {
-            delay(autoDismissMillis)
-            onDismiss()
+        if (visible && badgeId.isNotBlank()) {
+            internalVisible = true
         }
     }
 
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(animationSpec = tween(250)) + scaleIn(initialScale = 0.86f),
-            exit = fadeOut(animationSpec = tween(220)) + scaleOut(targetScale = 0.9f)
+    if (internalVisible) {
+        Dialog(
+            onDismissRequest = {},
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false
+            )
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.45f)),
-                contentAlignment = Alignment.Center
+            BoxWithConstraints(
+                modifier = modifier.fillMaxSize()
             ) {
-                Surface(
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp)
-                        .shadow(
-                            elevation = 30.dp,
-                            shape = RoundedCornerShape(28.dp),
-                            ambientColor = Color(0xFFFFA726).copy(alpha = glowAlpha.value),
-                            spotColor = Color(0xFFFF7043).copy(alpha = glowAlpha.value)
-                        ),
-                    color = Color(0xFF111215),
-                    shape = RoundedCornerShape(28.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.5.dp,
-                        Brush.linearGradient(
-                            listOf(
-                                Color(0xFFFFB74D).copy(alpha = 0.75f),
-                                Color(0xFFFF2D55).copy(alpha = 0.8f)
-                            )
-                        )
+                val widthPx = with(density) { maxWidth.toPx() }
+
+                LaunchedEffect(badgeId, widthPx) {
+                    if (badgeId.isBlank() || widthPx <= 0f) return@LaunchedEffect
+
+                    textVisible = false
+                    overlayAlpha.snapTo(0f)
+                    contentAlpha.snapTo(1f)
+                    trophyOffsetX.snapTo(-widthPx)
+
+                    overlayAlpha.animateTo(
+                        targetValue = 0.8f,
+                        animationSpec = tween(durationMillis = 300)
                     )
+                    trophyOffsetX.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 780, easing = FastOutSlowInEasing)
+                    )
+
+                    delay(90)
+                    textVisible = true
+                    delay(autoDismissMillis)
+
+                    contentAlpha.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 320)
+                    )
+                    overlayAlpha.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 320)
+                    )
+
+                    textVisible = false
+                    internalVisible = false
+                    onDismiss()
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = overlayAlpha.value))
+                )
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .graphicsLayer {
+                            translationX = trophyOffsetX.value
+                            alpha = contentAlpha.value
+                        }
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(56.dp)
                                 .background(
-                                    Brush.radialGradient(
-                                        colors = listOf(
-                                            Color(0xFFFFD54F),
-                                            Color(0xFFFF8A65)
-                                        )
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(Color(0xFFD32F2F), Color(0xFFB71C1C))
                                     ),
-                                    CircleShape
+                                    shape = CircleShape
                                 )
-                                .border(1.dp, Color.White.copy(alpha = 0.55f), CircleShape),
-                            contentAlignment = Alignment.Center
+                                .border(1.5.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                                .padding(20.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = "Badge desbloqueado",
+                                contentDescription = "Trofeo desbloqueado",
                                 tint = Color.White,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(48.dp)
                             )
                         }
 
-                        Text(
-                            text = "Badge desbloqueado",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = badgeId.toPremiumBadgeLabel(),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = Color(0xFFFFC107),
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            text = "Tu constancia suma XP y reputacion en Food View X",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.78f)
-                        )
+                        AnimatedVisibility(
+                            visible = textVisible,
+                            enter = fadeIn(animationSpec = tween(durationMillis = 260)) +
+                                slideInVertically(
+                                    animationSpec = tween(durationMillis = 260),
+                                    initialOffsetY = { it / 3 }
+                                ),
+                            exit = fadeOut(animationSpec = tween(durationMillis = 180))
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "NUEVO TROFEO",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.75f),
+                                            offset = Offset(0f, 2f),
+                                            blurRadius = 8f
+                                        )
+                                    ),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = badgeLabel,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.75f),
+                                            offset = Offset(0f, 2f),
+                                            blurRadius = 8f
+                                        )
+                                    ),
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
-}
-
-fun String.toPremiumBadgeLabel(): String {
-    return this
-        .substringAfterLast('_')
-        .replace('-', ' ')
-        .uppercase()
 }
