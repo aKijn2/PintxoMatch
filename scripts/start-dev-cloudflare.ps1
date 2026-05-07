@@ -106,6 +106,102 @@ function Wait-ForHealth {
     throw "Timed out waiting for health endpoint: $Uri"
 }
 
+function Wait-ForDnsResolution {
+    param(
+        [string]$Hostname,
+        [int]$TimeoutSeconds = 60
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastError = $null
+    $dnsServers = @($null, "1.1.1.1", "8.8.8.8")
+
+    while ((Get-Date) -lt $deadline) {
+        foreach ($dnsServer in $dnsServers) {
+            try {
+                $params = @{
+                    Name = $Hostname
+                    ErrorAction = "Stop"
+                }
+                if ($dnsServer) {
+                    $params.Server = $dnsServer
+                }
+
+                $result = Resolve-DnsName @params
+                if ($result) {
+                    return $result
+                }
+            }
+            catch {
+                $lastError = $_
+            }
+        }
+
+        Start-Sleep -Milliseconds 1000
+    }
+
+    if ($null -ne $lastError) {
+        throw $lastError
+    }
+
+    throw "Timed out waiting for DNS resolution: $Hostname"
+}
+
+function Get-ResolvedAddresses {
+    param([string]$Hostname)
+
+    $records = Wait-ForDnsResolution -Hostname $Hostname -TimeoutSeconds 5
+    return $records |
+        Where-Object { $_.Type -eq "A" -and $_.IPAddress } |
+        Select-Object -ExpandProperty IPAddress -Unique
+}
+
+function Wait-ForPublicHealth {
+    param(
+        [string]$Uri,
+        [int]$TimeoutSeconds = 60
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastError = $null
+    $uriObject = [Uri]$Uri
+    $hostname = $uriObject.Host
+
+    while ((Get-Date) -lt $deadline) {
+        try {
+            return Invoke-RestMethod -Method Get -Uri $Uri -TimeoutSec 5
+        }
+        catch {
+            $lastError = $_
+
+            try {
+                $addresses = Get-ResolvedAddresses -Hostname $hostname
+
+                if ($addresses -and (Get-Command "curl.exe" -ErrorAction SilentlyContinue)) {
+                    foreach ($address in $addresses) {
+                        $resolveArg = "${hostname}:$($uriObject.Port):$address"
+                        $response = curl.exe --silent --show-error --fail --connect-timeout 5 --max-time 8 --resolve $resolveArg $Uri
+                        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($response)) {
+                            return $response | ConvertFrom-Json
+                        }
+                    }
+                }
+            }
+            catch {
+                $lastError = $_
+            }
+
+            Start-Sleep -Milliseconds 700
+        }
+    }
+
+    if ($null -ne $lastError) {
+        throw $lastError
+    }
+
+    throw "Timed out waiting for public health endpoint: $Uri"
+}
+
 function Get-PropertyValue {
     param(
         [string]$FilePath,
@@ -135,12 +231,12 @@ function Stop-PreviousTunnel {
 
     try {
         $info = Get-Content -Path $TunnelInfoFilePath -Raw | ConvertFrom-Json
-        $pid = $info.cloudflaredPid
-        if ($pid) {
-            $process = Get-Process -Id $pid -ErrorAction SilentlyContinue
+        $cloudflaredPid = $info.cloudflaredPid
+        if ($cloudflaredPid) {
+            $process = Get-Process -Id $cloudflaredPid -ErrorAction SilentlyContinue
             if ($process) {
-                Stop-Process -Id $pid -Force -ErrorAction Stop
-                Write-Host "Stopped previous Cloudflare tunnel PID $pid"
+                Stop-Process -Id $cloudflaredPid -Force -ErrorAction Stop
+                Write-Host "Stopped previous Cloudflare tunnel PID $cloudflaredPid"
             }
         }
     }
@@ -177,12 +273,17 @@ try {
 
     Write-Host "Tunnel URL detected: $tunnelUrl"
 
+    $tunnelHostname = ([Uri]$tunnelUrl).Host
+    Write-Host "Waiting for public DNS propagation for $tunnelHostname..."
+    Wait-ForDnsResolution -Hostname $tunnelHostname -TimeoutSeconds ([Math]::Max($TunnelTimeoutSeconds, 60)) | Out-Null
+
     $env:PUBLIC_BASE_URL = $tunnelUrl
     Write-Host "Recreating image server with updated PUBLIC_BASE_URL..."
     docker compose -f $composeFile up -d --force-recreate | Out-Null
 
     $health = Wait-ForHealth -Uri "http://localhost:8080/health" -TimeoutSeconds 40
-    $publicHealth = Wait-ForHealth -Uri "$tunnelUrl/health" -TimeoutSeconds 40
+    Start-Sleep -Seconds 2
+    $publicHealth = Wait-ForPublicHealth -Uri "$tunnelUrl/health" -TimeoutSeconds ([Math]::Max($TunnelTimeoutSeconds, 60))
 
     Set-Or-AppendProperty -FilePath $localPropertiesPath -Key "LOCAL_IMAGE_BASE_URL" -Value $tunnelUrl
 
