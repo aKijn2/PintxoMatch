@@ -7,6 +7,7 @@ import com.example.pintxomatch.data.model.gamification.WeeklyChallengeProgress
 import com.example.pintxomatch.data.model.gamification.toUserGamification
 import com.example.pintxomatch.data.model.gamification.toWeeklyChallengeOrNull
 import com.example.pintxomatch.domain.gamification.GamificationRules
+import com.example.pintxomatch.domain.gamification.WEEKLY_CHALLENGE_COMPLETION_XP
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
@@ -60,7 +61,6 @@ internal fun computeAwardComputation(
     actionType: GamificationActionType,
     now: Long
 ): AwardComputation {
-    val updatedXp = currentGamification.xp + actionType.xpReward
     val updatedStreak = GamificationRules.calculateUpdatedStreak(
         previousStreak = currentGamification.currentStreak,
         previousLastActionTimestamp = currentGamification.lastActionTimestamp,
@@ -70,6 +70,7 @@ internal fun computeAwardComputation(
     val mutableBadges = currentGamification.badges.toMutableSet()
     val unlockedBadges = mutableListOf<String>()
     val progressResults = linkedMapOf<String, ChallengeProgressResult>()
+    var completedChallengeCount = 0
 
     matchingChallenges.forEach { challenge ->
         val previous = previousProgressByChallenge[challenge.id] ?: ChallengeProgressState()
@@ -85,6 +86,9 @@ internal fun computeAwardComputation(
         if (completedNow && mutableBadges.add(challenge.badgeId)) {
             unlockedBadges.add(challenge.badgeId)
         }
+        if (completedNow) {
+            completedChallengeCount += 1
+        }
 
         progressResults[challenge.id] = ChallengeProgressResult(
             challenge = challenge,
@@ -93,6 +97,10 @@ internal fun computeAwardComputation(
             completedNow = completedNow
         )
     }
+
+    val updatedXp = currentGamification.xp +
+        actionType.xpReward +
+        (completedChallengeCount * WEEKLY_CHALLENGE_COMPLETION_XP)
 
     return AwardComputation(
         updatedUser = UserGamification(

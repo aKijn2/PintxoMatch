@@ -55,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,11 +69,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.pintxomatch.data.model.gamification.GamificationActionType
+import com.example.pintxomatch.data.repository.gamification.GamificationRepository
+import com.example.pintxomatch.ui.common.components.BadgeUnlockedPopup
 import com.example.pintxomatch.ui.common.components.ModernTopToast
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.pintxomatch.data.repository.media.ImageRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 data class ReviewItem(
@@ -118,6 +123,8 @@ private data class PintxoCommunityGroup(
 fun ReviewsScreen(onNavigateBack: () -> Unit) {
     val auth = FirebaseAuth.getInstance()
     val firestore = FirebaseFirestore.getInstance()
+    val coroutineScope = rememberCoroutineScope()
+    val gamificationRepository = remember { GamificationRepository() }
 
     var ratedPintxos by remember { mutableStateOf<List<RatedPintxoOption>>(emptyList()) }
     var selectedPintxoId by remember { mutableStateOf("") }
@@ -135,6 +142,7 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
     var communitySearchQuery by remember { mutableStateOf("") }
     var expandedCommunityGroup by remember { mutableStateOf<PintxoCommunityGroup?>(null) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
+    var unlockedBadgeId by remember { mutableStateOf<String?>(null) }
 
     fun loadData() {
         isLoading = true
@@ -305,6 +313,17 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
                     selectedStars = 0
                     editingReviewId = null
                     alertMessage = if (existingMine == null) "Reseña publicada" else "Reseña actualizada"
+                    coroutineScope.launch {
+                        runCatching {
+                            gamificationRepository.awardXpForAction(uid, GamificationActionType.RATE_PINTXO)
+                                .unlockedBadges
+                                .firstOrNull()
+                        }.onSuccess { unlocked ->
+                            if (!unlocked.isNullOrBlank()) {
+                                unlockedBadgeId = unlocked
+                            }
+                        }
+                    }
                     loadData()
                 }
             }
@@ -767,6 +786,13 @@ fun ReviewsScreen(onNavigateBack: () -> Unit) {
             message = alertMessage,
             onDismiss = { alertMessage = null },
             modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        BadgeUnlockedPopup(
+            visible = !unlockedBadgeId.isNullOrBlank(),
+            badgeId = unlockedBadgeId.orEmpty(),
+            onDismiss = { unlockedBadgeId = null },
+            modifier = Modifier.align(Alignment.Center)
         )
     }
 }

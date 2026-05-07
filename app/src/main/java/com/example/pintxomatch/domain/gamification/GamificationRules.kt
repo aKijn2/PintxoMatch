@@ -5,6 +5,7 @@ import kotlin.math.max
 const val XP_PER_LEVEL = 100
 const val RATE_PINTXO_XP = 10
 const val UPLOAD_PINTXO_XP = 50
+const val WEEKLY_CHALLENGE_COMPLETION_XP = 25
 
 private const val MILLIS_IN_DAY = 24L * 60L * 60L * 1000L
 private const val MILLIS_48_HOURS = 48L * 60L * 60L * 1000L

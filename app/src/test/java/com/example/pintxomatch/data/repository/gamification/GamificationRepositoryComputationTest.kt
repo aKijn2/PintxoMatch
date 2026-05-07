@@ -44,7 +44,7 @@ class GamificationRepositoryComputationTest {
             now = now
         )
 
-        assertEquals(90, computation.updatedUser.xp)
+        assertEquals(115, computation.updatedUser.xp)
         assertEquals(1, computation.updatedUser.currentStreak)
         assertTrue(computation.updatedUser.badges.contains(challenge.badgeId))
         assertEquals(listOf(challenge.badgeId), computation.unlockedBadges)
@@ -83,5 +83,50 @@ class GamificationRepositoryComputationTest {
         assertEquals(1, progress.progressCount)
         assertTrue(progress.completed)
         assertTrue(!progress.completedNow)
+    }
+
+    @Test
+    fun computeAwardComputation_addsChallengeCompletionBonusPerCompletedChallenge() {
+        val rateChallenge = rateChallenge(target = 1)
+        val uploadChallenge = WeeklyChallenge(
+            id = "upload-1",
+            weekId = "2026-W14",
+            title = "Sube 1 pintxo",
+            description = "Sube un pintxo esta semana",
+            actionType = GamificationActionType.UPLOAD_PINTXO,
+            targetCount = 1,
+            badgeId = "badge_2026W14_creator",
+            startsAt = 0L,
+            endsAt = Long.MAX_VALUE,
+            isActive = true
+        )
+
+        val uploadComputation = computeAwardComputation(
+            currentGamification = UserGamification(
+                xp = 40,
+                currentStreak = 1,
+                lastActionTimestamp = 0L,
+                badges = emptyList()
+            ),
+            matchingChallenges = listOf(uploadChallenge),
+            previousProgressByChallenge = mapOf(
+                uploadChallenge.id to ChallengeProgressState(progressCount = 0, completed = false)
+            ),
+            actionType = GamificationActionType.UPLOAD_PINTXO,
+            now = 1000L
+        )
+
+        val rateComputation = computeAwardComputation(
+            currentGamification = uploadComputation.updatedUser,
+            matchingChallenges = listOf(rateChallenge),
+            previousProgressByChallenge = mapOf(
+                rateChallenge.id to ChallengeProgressState(progressCount = 0, completed = false)
+            ),
+            actionType = GamificationActionType.RATE_PINTXO,
+            now = 2000L
+        )
+
+        assertEquals(115, uploadComputation.updatedUser.xp)
+        assertEquals(150, rateComputation.updatedUser.xp)
     }
 }
