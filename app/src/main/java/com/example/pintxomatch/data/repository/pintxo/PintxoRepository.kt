@@ -272,6 +272,7 @@ class PintxoRepository {
                     id = doc.id,
                     name = doc.getString("nombre") ?: "Sin nombre",
                     barName = doc.getString("bar") ?: "Bar desconocido",
+                    imageUrl = ImageRepository.normalizeImageUrlForCurrentProvider(doc.getString("imageUrl")) ?: "",
                     averageRating = averageRating,
                     ratingCount = ratingCount
                 )

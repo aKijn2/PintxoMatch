@@ -3,6 +3,7 @@ package com.example.pintxomatch.ui.leaderboard
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,12 +20,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,7 +47,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -105,6 +112,7 @@ fun LeaderboardScreen(
                     CircularProgressIndicator()
                 }
             }
+
             is LeaderboardUiState.Error -> {
                 Box(
                     modifier = Modifier
@@ -118,6 +126,7 @@ fun LeaderboardScreen(
                     )
                 }
             }
+
             else -> {
                 if (users.isEmpty() && topRatedPintxos.isEmpty()) {
                     Box(
@@ -127,7 +136,7 @@ fun LeaderboardScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "Aún no hay datos suficientes para el ranking",
+                            "Aun no hay datos suficientes para el ranking",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -152,7 +161,6 @@ fun LeaderboardScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Podium card
                             item {
                                 Surface(
                                     modifier = Modifier
@@ -170,11 +178,10 @@ fun LeaderboardScreen(
                                 }
                             }
 
-                            // Users full list
                             if (users.size > 3) {
                                 item {
                                     SectionLabel(
-                                        title = "Clasificación completa",
+                                        title = "Clasificacion completa",
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .widthIn(max = maxCardWidth)
@@ -193,15 +200,14 @@ fun LeaderboardScreen(
                                 }
                             }
 
-                            // Pintxos section header
                             item {
                                 SectionLabel(
                                     title = "Pintxos mejor valorados",
-                                    subtitle = "Ordenados por nota media · empates por nº reseñas",
+                                    subtitle = "Una seccion mas visual, deliciosa y facil de escanear",
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .widthIn(max = maxCardWidth)
-                                        .padding(top = 6.dp, bottom = 2.dp)
+                                        .padding(top = 10.dp, bottom = 4.dp)
                                 )
                             }
 
@@ -215,20 +221,41 @@ fun LeaderboardScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            "Todavía no hay pintxos valorados.",
+                                            "Todavia no hay pintxos valorados.",
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
                             } else {
-                                itemsIndexed(topRatedPintxos.take(20)) { index, pintxo ->
-                                    PintxoRankingRow(
-                                        index = index,
-                                        pintxo = pintxo,
+                                item {
+                                    PintxoTopShowcase(
+                                        pintxos = topRatedPintxos.take(3),
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .widthIn(max = maxCardWidth)
                                     )
+                                }
+
+                                if (topRatedPintxos.size > 3) {
+                                    item {
+                                        SectionLabel(
+                                            title = "Mas joyas de la comunidad",
+                                            subtitle = "Ordenadas por nota media y fuerza de votos",
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .widthIn(max = maxCardWidth)
+                                                .padding(top = 8.dp, bottom = 2.dp)
+                                        )
+                                    }
+                                    itemsIndexed(topRatedPintxos.drop(3).take(17)) { index, pintxo ->
+                                        PintxoRankingRow(
+                                            index = index + 3,
+                                            pintxo = pintxo,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .widthIn(max = maxCardWidth)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -264,13 +291,13 @@ private fun SectionLabel(
 
 @Composable
 private fun PodiumHeroCard(users: List<LeaderboardUser>) {
-    val goldColor   = Color(0xFFFFD700)
+    val goldColor = Color(0xFFFFD700)
     val silverColor = Color(0xFFB0BEC5)
     val bronzeColor = Color(0xFFCD7F32)
 
-    val first  = users.getOrNull(0)
+    val first = users.getOrNull(0)
     val second = users.getOrNull(1)
-    val third  = users.getOrNull(2)
+    val third = users.getOrNull(2)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -501,7 +528,350 @@ private fun UserRankingRow(
                     .clip(RoundedCornerShape(50)),
                 trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                strokeCap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+@Composable
+private fun PintxoTopShowcase(
+    pintxos: List<LeaderboardPintxo>,
+    modifier: Modifier = Modifier
+) {
+    val first = pintxos.getOrNull(0)
+    val second = pintxos.getOrNull(1)
+    val third = pintxos.getOrNull(2)
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        if (first != null) {
+            FeaturedPintxoCard(
+                pintxo = first,
+                position = 1,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (second != null || third != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                second?.let {
+                    SecondaryPintxoCard(
+                        pintxo = it,
+                        position = 2,
+                        modifier = Modifier.width(260.dp)
+                    )
+                }
+                third?.let {
+                    SecondaryPintxoCard(
+                        pintxo = it,
+                        position = 3,
+                        modifier = Modifier.width(260.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeaturedPintxoCard(
+    pintxo: LeaderboardPintxo,
+    position: Int,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.4f)),
+        shadowElevation = 4.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(260.dp)
+        ) {
+            if (pintxo.imageUrl.isNotBlank()) {
+                AsyncImage(
+                    model = pintxo.imageUrl,
+                    contentDescription = pintxo.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(Color(0xFFD32F2F), Color(0xFF1B1B1B))
+                            )
+                        )
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.08f),
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.72f)
+                            )
+                        )
+                    )
+            )
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(14.dp),
+                shape = RoundedCornerShape(999.dp),
+                color = Color(0xFFFFD54F).copy(alpha = 0.96f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.65f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "#$position",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 13.sp,
+                        color = Color(0xFF5D4037)
+                    )
+                    Text(
+                        text = "TOP DEL DIA",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp,
+                        color = Color(0xFF5D4037),
+                        letterSpacing = 0.6.sp
+                    )
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(14.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = Color.Black.copy(alpha = 0.34f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFC107),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = String.format(java.util.Locale.US, "%.1f", pintxo.averageRating),
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = pintxo.name,
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.LocationOn,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.84f),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = pintxo.barName,
+                        color = Color.White.copy(alpha = 0.9f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MetricChip(
+                        icon = Icons.Default.LocalFireDepartment,
+                        label = if (pintxo.ratingCount == 1) "1 voto" else "${pintxo.ratingCount} votos"
+                    )
+                    MetricChip(
+                        icon = Icons.Default.AutoAwesome,
+                        label = "Favorito del ranking"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SecondaryPintxoCard(
+    pintxo: LeaderboardPintxo,
+    position: Int,
+    modifier: Modifier = Modifier
+) {
+    val accent = when (position) {
+        2 -> Color(0xFFB0BEC5)
+        3 -> Color(0xFFCD7F32)
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.32f)),
+        shadowElevation = 2.dp
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+            ) {
+                if (pintxo.imageUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = pintxo.imageUrl,
+                        contentDescription = pintxo.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(accent.copy(alpha = 0.9f), MaterialTheme.colorScheme.surfaceContainerHigh)
+                                )
+                            )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.46f))
+                            )
+                        )
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = accent.copy(alpha = 0.92f)
+                ) {
+                    Text(
+                        text = "#$position",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                }
+
+                Text(
+                    text = String.format(java.util.Locale.US, "%.1f ★", pintxo.averageRating),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(12.dp),
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = pintxo.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = pintxo.barName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (pintxo.ratingCount == 1) "1 valoracion" else "${pintxo.ratingCount} valoraciones",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = accent,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String
+) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = Color.White.copy(alpha = 0.14f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = label,
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium
             )
         }
     }
@@ -513,28 +883,15 @@ private fun PintxoRankingRow(
     pintxo: LeaderboardPintxo,
     modifier: Modifier = Modifier
 ) {
-    val goldColor   = Color(0xFFFFD700)
-    val silverColor = Color(0xFFB0BEC5)
-    val bronzeColor = Color(0xFFCD7F32)
-
-    val medalColor = when (index) {
-        0 -> goldColor
-        1 -> silverColor
-        2 -> bronzeColor
-        else -> MaterialTheme.colorScheme.outlineVariant
-    }
-    val isTopThree = index < 3
+    val accentColor = MaterialTheme.colorScheme.primary
     val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            1.dp,
-            if (isTopThree) medalColor.copy(alpha = 0.35f) else colorOnSurfaceVariant.copy(alpha = 0.12f)
-        ),
-        shadowElevation = if (isTopThree) 2.dp else 1.dp
+        border = BorderStroke(1.dp, colorOnSurfaceVariant.copy(alpha = 0.12f)),
+        shadowElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
@@ -546,15 +903,15 @@ private fun PintxoRankingRow(
             Surface(
                 modifier = Modifier.size(36.dp),
                 shape = CircleShape,
-                color = if (isTopThree) medalColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = if (isTopThree) BorderStroke(1.5.dp, medalColor.copy(alpha = 0.5f)) else null
+                color = accentColor.copy(alpha = 0.10f),
+                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.18f))
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = "${index + 1}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = if (isTopThree) 14.sp else 12.sp,
-                        color = if (isTopThree) medalColor else colorOnSurfaceVariant
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp,
+                        color = accentColor
                     )
                 }
             }
@@ -569,7 +926,7 @@ private fun PintxoRankingRow(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = pintxo.barName,
+                    text = "${pintxo.barName} · ${if (pintxo.ratingCount == 1) "1 voto" else "${pintxo.ratingCount} votos"}",
                     style = MaterialTheme.typography.labelSmall,
                     color = colorOnSurfaceVariant,
                     maxLines = 1,
@@ -577,28 +934,21 @@ private fun PintxoRankingRow(
                 )
             }
 
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(
-                        text = String.format(java.util.Locale.US, "%.1f", pintxo.averageRating),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = Color(0xFFFFC107),
-                        modifier = Modifier.size(15.dp)
-                    )
-                }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Text(
-                    text = if (pintxo.ratingCount == 1) "1 voto" else "${pintxo.ratingCount} votos",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colorOnSurfaceVariant
+                    text = String.format(java.util.Locale.US, "%.1f", pintxo.averageRating),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = accentColor
+                )
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = Color(0xFFFFC107),
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }

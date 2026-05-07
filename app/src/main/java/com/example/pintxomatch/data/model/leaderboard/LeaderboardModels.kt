@@ -11,6 +11,7 @@ data class LeaderboardPintxo(
     val id: String,
     val name: String,
     val barName: String,
+    val imageUrl: String = "",
     val averageRating: Double,
     val ratingCount: Int
 )
