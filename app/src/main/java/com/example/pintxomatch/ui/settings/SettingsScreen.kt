@@ -2,6 +2,9 @@ package com.example.pintxomatch.ui.settings
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,29 +16,52 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SupportAgent
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -54,7 +80,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
@@ -68,6 +93,16 @@ fun SettingsScreen(
     val normalizedUserPhotoUrl = remember(user?.photoUrl?.toString()) {
         ImageRepository.normalizeImageUrlForCurrentProvider(user?.photoUrl?.toString())
     }
+    val pageBrush = remember {
+        Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFFFFFDF8),
+                Color(0xFFFFF8F1),
+                Color(0xFFFFF4EA)
+            )
+        )
+    }
+
     var notificationsEnabled by remember { mutableStateOf(true) }
     var reviewNotificationsEnabled by remember { mutableStateOf(true) }
     var supportNotificationsEnabled by remember { mutableStateOf(true) }
@@ -112,201 +147,307 @@ fun SettingsScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ajustes", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(pageBrush)
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Surface(
+                        onClick = onNavigateBack,
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                        shadowElevation = 4.dp
+                    ) {
+                        Box(
+                            modifier = Modifier.size(42.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Volver",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "CONTROL",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.4.sp
+                        )
+                        Text(
+                            text = "Ajustes",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black
+                        )
                     }
                 }
-            )
-        }
-    ) { padding ->
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            val isWideLayout = maxWidth >= 600.dp
-
-            Column(
+            }
+        ) { padding ->
+            BoxWithConstraints(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .widthIn(max = 760.dp)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .fillMaxSize()
+                    .padding(padding)
             ) {
-                Spacer(modifier = Modifier.height(4.dp))
+                val isWideLayout = maxWidth >= 600.dp
 
-                // Account card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .widthIn(max = 760.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(26.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+                        )
                     ) {
-                        Surface(
-                            modifier = Modifier.size(56.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            if (!normalizedUserPhotoUrl.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = normalizedUserPhotoUrl,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape)
-                                )
-                            } else {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.Person,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.primary
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(64.dp),
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    border = BorderStroke(
+                                        2.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                    )
+                                ) {
+                                    if (!normalizedUserPhotoUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = normalizedUserPhotoUrl,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(CircleShape)
+                                        )
+                                    } else {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Default.Person,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(28.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = user?.displayName?.takeIf { it.isNotBlank() }
+                                            ?: user?.email?.substringBefore("@")
+                                            ?: "Usuario",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 22.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = user?.email ?: "",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = user?.displayName?.takeIf { it.isNotBlank() }
-                                    ?: user?.email?.substringBefore("@")
-                                    ?: "Usuario",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
-                            Text(
-                                text = user?.email ?: "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+
+                            Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "Cuenta activa",
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "Gestiona perfil, soporte y preferencias",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primary
+                                    ) {
+                                        Box(modifier = Modifier.size(10.dp))
+                                    }
+                                }
+                            }
                         }
                     }
-                }
 
-                // General section
-                SettingsGroup(title = "General") {
-                    NotificationPreferencesCard(
-                        notificationsEnabled = notificationsEnabled,
-                        onNotificationsEnabledChange = { notificationsEnabled = it },
-                        reviewNotificationsEnabled = reviewNotificationsEnabled,
-                        onReviewNotificationsEnabledChange = { reviewNotificationsEnabled = it },
-                        supportNotificationsEnabled = supportNotificationsEnabled,
-                        onSupportNotificationsEnabledChange = { supportNotificationsEnabled = it },
-                        optionsExpanded = notificationOptionsExpanded,
-                        onOptionsExpandedChange = { notificationOptionsExpanded = it },
-                        isWideLayout = isWideLayout
-                    )
-                }
+                    SettingsGroup(title = "General") {
+                        NotificationPreferencesCard(
+                            notificationsEnabled = notificationsEnabled,
+                            onNotificationsEnabledChange = { notificationsEnabled = it },
+                            reviewNotificationsEnabled = reviewNotificationsEnabled,
+                            onReviewNotificationsEnabledChange = { reviewNotificationsEnabled = it },
+                            supportNotificationsEnabled = supportNotificationsEnabled,
+                            onSupportNotificationsEnabledChange = { supportNotificationsEnabled = it },
+                            optionsExpanded = notificationOptionsExpanded,
+                            onOptionsExpandedChange = { notificationOptionsExpanded = it },
+                            isWideLayout = isWideLayout
+                        )
+                    }
 
-                // Account section
-                SettingsGroup(title = "Cuenta") {
-                    SettingsActionRow(
-                        icon = Icons.Default.Person,
-                        label = "Ver perfil",
-                        onClick = onNavigateToProfile
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
-                    SettingsActionRow(
-                        icon = Icons.Default.SupportAgent,
-                        label = "Soporte",
-                        onClick = { openSupportFlow() }
-                    )
-                }
+                    SettingsGroup(title = "Cuenta") {
+                        SettingsActionRow(
+                            icon = Icons.Default.Person,
+                            label = "Ver perfil",
+                            subtitle = "Edita tu perfil y revisa tus aportaciones",
+                            onClick = onNavigateToProfile
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                        SettingsActionRow(
+                            icon = Icons.Default.SupportAgent,
+                            label = "Soporte",
+                            subtitle = "Abre o revisa tus tickets de ayuda",
+                            onClick = { openSupportFlow() }
+                        )
+                    }
 
-                // App info section
-                SettingsGroup(title = "Aplicación") {
-                    SettingsInfoRow(
-                        icon = Icons.Default.Info,
-                        label = "Versión",
-                        value = "1.0.0"
-                    )
-                }
+                    SettingsGroup(title = "Aplicacion") {
+                        SettingsInfoRow(
+                            icon = Icons.Default.Info,
+                            label = "Version",
+                            value = "1.0.0",
+                            subtitle = "Compilacion actual instalada"
+                        )
+                    }
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    onClick = onLogout,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        onClick = onLogout,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.34f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Logout,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                        Text(
-                            text = "Cerrar sesión",
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.weight(1f)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.10f)
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(40.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Logout,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Cerrar sesion",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = "Salir de esta cuenta en el dispositivo",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.78f)
+                                )
+                            }
+                        }
+                    }
+
+                    SettingsGroup(title = "Zona peligrosa") {
+                        SettingsActionRow(
+                            icon = Icons.Default.Delete,
+                            label = "Eliminar mi cuenta",
+                            subtitle = "Borra tu acceso y anonimiza tus datos publicos",
+                            textColor = MaterialTheme.colorScheme.error,
+                            onClick = { showDeleteDialog = true }
                         )
                     }
-                }
 
-                // Delete Account (Danger Zone)
-                SettingsGroup(title = "Zona Peligrosa") {
-                    SettingsActionRow(
-                        icon = Icons.Default.Delete,
-                        label = "Eliminar mi cuenta definitivamente",
-                        textColor = MaterialTheme.colorScheme.error,
-                        onClick = { showDeleteDialog = true }
-                    )
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
             }
         }
+
+        ModernTopToast(
+            message = alertMessage,
+            onDismiss = { alertMessage = null },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 
-    // DIÁLOGO DE CONFIRMACIÓN DE ELIMINACIÓN
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = {
                 showDeleteDialog = false
                 deletePassword = ""
             },
-            title = { Text("¿Deseas marcharte?") },
+            title = { Text("Deseas marcharte?") },
             text = {
                 Column {
-                    Text("Esta acción es irreversible.")
+                    Text("Esta accion es irreversible.")
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("Se borrará:")
-                    Text("- Tu cuenta de acceso (email/contraseña)")
-                    Text("- Tu sesión y tu perfil vinculado")
+                    Text("Se borrara:")
+                    Text("- Tu cuenta de acceso")
+                    Text("- Tu sesion y tu perfil vinculado")
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("Se conservará:")
+                    Text("Se conservara:")
                     Text("- Los pintxos que ya compartiste")
-                    Text("- Tus pintxos quedarán anonimizados como 'Usuario eliminado'")
+                    Text("- Tus pintxos quedaran anonimizados como 'Usuario eliminado'")
                     Spacer(modifier = Modifier.height(14.dp))
-                    Text("Introduce tu contraseña para confirmar:")
+                    Text("Introduce tu contrasena para confirmar:")
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = deletePassword,
                         onValueChange = { deletePassword = it },
-                        label = { Text("Contraseña") },
+                        label = { Text("Contrasena") },
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth()
@@ -320,17 +461,14 @@ fun SettingsScreen(
                         val uid = currentUser?.uid
                         val email = currentUser?.email
                         if (currentUser == null || uid.isNullOrBlank() || email.isNullOrBlank()) {
-                            // En un entorno real, usaríamos un snackbar. Por simplicidad aquí:
                             showDeleteDialog = false
                             return@Button
                         }
                         if (deletePassword.isBlank()) return@Button
 
-                        // 1. Re-autenticar al usuario
                         val credential = EmailAuthProvider.getCredential(email, deletePassword)
                         currentUser.reauthenticate(credential)
                             .addOnSuccessListener {
-                                // 2. Anonimizar o borrar pintxos
                                 val db = FirebaseFirestore.getInstance()
                                 db.collection("Pintxos")
                                     .whereEqualTo("uploaderUid", uid)
@@ -356,7 +494,6 @@ fun SettingsScreen(
 
                                         batch.commit()
                                             .addOnSuccessListener {
-                                                // 3. Borrar la cuenta en Auth después de proteger los datos
                                                 currentUser.delete()
                                                     .addOnSuccessListener { onLogout() }
                                             }
@@ -365,7 +502,7 @@ fun SettingsScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Confirmar eliminación")
+                    Text("Confirmar eliminacion")
                 }
             },
             dismissButton = {
@@ -373,7 +510,7 @@ fun SettingsScreen(
                     showDeleteDialog = false
                     deletePassword = ""
                 }) {
-                    Text("Seguir aquí")
+                    Text("Seguir aqui")
                 }
             }
         )
@@ -424,11 +561,6 @@ fun SettingsScreen(
             }
         )
     }
-
-    ModernTopToast(
-        message = alertMessage,
-        onDismiss = { alertMessage = null }
-    )
 }
 
 @Composable
@@ -440,39 +572,21 @@ private fun SettingsGroup(
         Text(
             text = title.uppercase(),
             style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Black,
             color = MaterialTheme.colorScheme.primary,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+            letterSpacing = 1.4.sp,
+            modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            shape = RoundedCornerShape(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+            )
         ) {
             content()
         }
-    }
-}
-
-@Composable
-private fun SettingsToggleRow(
-    icon: ImageVector,
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-        Text(text = label, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -497,21 +611,38 @@ private fun NotificationPreferencesCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onOptionsExpandedChange(!optionsExpanded) }
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Icon(
-                Icons.Default.Notifications,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
-            )
-            Text(
-                text = "Notificaciones",
-                modifier = Modifier.weight(1f),
-                fontWeight = FontWeight.Medium
-            )
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+            ) {
+                Box(
+                    modifier = Modifier.size(38.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Notificaciones",
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Controla alertas y avisos importantes",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Icon(
                 imageVector = if (optionsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 contentDescription = if (optionsExpanded) "Ocultar opciones" else "Mostrar opciones",
@@ -522,15 +653,15 @@ private fun NotificationPreferencesCard(
                 checked = notificationsEnabled,
                 onCheckedChange = {
                     onNotificationsEnabledChange(it)
-                    if (it) onOptionsExpandedChange(true) else onOptionsExpandedChange(false)
+                    onOptionsExpandedChange(it)
                 }
             )
         }
 
         if (!notificationsEnabled) {
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+            HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
             Text(
-                text = "Activa las notificaciones para recibir avisos de reseñas y soporte.",
+                text = "Activa las notificaciones para recibir avisos de resenas y soporte.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
@@ -538,7 +669,7 @@ private fun NotificationPreferencesCard(
             return
         }
 
-        HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+        HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
 
         AnimatedVisibility(visible = optionsExpanded) {
             if (isWideLayout) {
@@ -551,7 +682,7 @@ private fun NotificationPreferencesCard(
                     NotificationOptionTile(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Default.Notifications,
-                        title = "Reseñas y actividad",
+                        title = "Resenas y actividad",
                         subtitle = "Avisos cuando haya movimiento en tus valoraciones.",
                         checked = reviewNotificationsEnabled,
                         onCheckedChange = onReviewNotificationsEnabledChange
@@ -575,7 +706,7 @@ private fun NotificationPreferencesCard(
                     NotificationOptionTile(
                         modifier = Modifier.fillMaxWidth(),
                         icon = Icons.Default.Notifications,
-                        title = "Reseñas y actividad",
+                        title = "Resenas y actividad",
                         subtitle = "Avisos cuando haya movimiento en tus valoraciones.",
                         checked = reviewNotificationsEnabled,
                         onCheckedChange = onReviewNotificationsEnabledChange
@@ -605,7 +736,7 @@ private fun NotificationOptionTile(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Row(
@@ -649,14 +780,15 @@ private fun NotificationOptionTile(
 private fun SettingsActionRow(
     icon: ImageVector,
     label: String,
-    textColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    subtitle: String? = null,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(0.dp),
         onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
     ) {
         Row(
             modifier = Modifier
@@ -665,9 +797,51 @@ private fun SettingsActionRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = if (textColor == MaterialTheme.colorScheme.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-            Text(text = label, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium, color = textColor)
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(
+                shape = CircleShape,
+                color = if (textColor == MaterialTheme.colorScheme.error) {
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.10f)
+                } else {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                }
+            ) {
+                Box(
+                    modifier = Modifier.size(38.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = if (textColor == MaterialTheme.colorScheme.error) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -676,7 +850,8 @@ private fun SettingsActionRow(
 private fun SettingsInfoRow(
     icon: ImageVector,
     label: String,
-    value: String
+    value: String,
+    subtitle: String? = null
 ) {
     Row(
         modifier = Modifier
@@ -685,8 +860,41 @@ private fun SettingsInfoRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-        Text(text = label, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
-        Text(text = value, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+        ) {
+            Box(
+                modifier = Modifier.size(38.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Text(
+            text = value,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
