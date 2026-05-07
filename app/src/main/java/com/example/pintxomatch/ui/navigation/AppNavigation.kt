@@ -34,7 +34,7 @@ fun AppNavigation(
     navController: NavHostController = rememberNavController()
 ) {
     val auth = FirebaseAuth.getInstance()
-    val startScreen = if (auth.currentUser == null) "login" else "home"
+    val startScreen = "home"
 
     LaunchedEffect(auth.currentUser?.uid) {
         val uid = auth.currentUser?.uid
@@ -68,54 +68,133 @@ fun AppNavigation(
             val currentUid = auth.currentUser?.uid
             HomeReviewScreen(
                 isAdmin = currentUid == ADMIN_UID,
-                onNavigateToProfile = { navController.navigate("profile") },
-                onNavigateToUpload = { navController.navigate("upload") },
-                onNavigateToReviews = { navController.navigate("reviews") },
+                onNavigateToProfile = {
+                    if (auth.currentUser == null) navController.navigate("login")
+                    else navController.navigate("profile")
+                },
+                onNavigateToUpload = {
+                    if (auth.currentUser == null) navController.navigate("login")
+                    else navController.navigate("upload")
+                },
+                onNavigateToReviews = {
+                    if (auth.currentUser == null) navController.navigate("login")
+                    else navController.navigate("reviews")
+                },
                 onNavigateToLeaderboard = { navController.navigate("leaderboard") },
                 onNavigateToNearby = { navController.navigate("nearby_restaurants") },
-                onNavigateToSupport = { navController.navigate("support") },
+                onNavigateToSupport = {
+                    if (auth.currentUser == null) navController.navigate("login")
+                    else navController.navigate("support")
+                },
                 onNavigateToSupportInbox = { navController.navigate("support_inbox") },
-                onNavigateToSettings = { navController.navigate("settings") },
-                onNavigateToPublicProfile = { uid -> navController.navigate("public_profile/$uid") }
+                onNavigateToSettings = {
+                    if (auth.currentUser == null) navController.navigate("login")
+                    else navController.navigate("settings")
+                },
+                onNavigateToPublicProfile = { uid ->
+                    if (auth.currentUser == null) navController.navigate("login")
+                    else navController.navigate("public_profile/$uid")
+                },
+                onRequireAuth = { navController.navigate("login") }
             )
         }
 
         composable("profile") {
-            UserProfileScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
-            )
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                UserProfileScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
+                )
+            }
         }
 
         composable("user_pintxos") {
-            UserPintxosScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToEdit = { pintxoId -> navController.navigate("edit_pintxo/$pintxoId") }
-            )
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                UserPintxosScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToEdit = { pintxoId -> navController.navigate("edit_pintxo/$pintxoId") }
+                )
+            }
         }
 
         composable("edit_pintxo/{pintxoId}") { backStackEntry ->
-            val pintxoId = backStackEntry.arguments?.getString("pintxoId") ?: return@composable
-            EditPintxoScreen(
-                pintxoId = pintxoId,
-                onNavigateBack = { navController.popBackStack() }
-            )
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                val pintxoId = backStackEntry.arguments?.getString("pintxoId") ?: return@composable
+                EditPintxoScreen(
+                    pintxoId = pintxoId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
 
         composable("upload") {
-            UploadPintxoScreen(onNavigateBack = { navController.popBackStack() })
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                UploadPintxoScreen(onNavigateBack = { navController.popBackStack() })
+            }
         }
 
         composable("reviews") {
-            ReviewsScreen(onNavigateBack = { navController.popBackStack() })
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                ReviewsScreen(onNavigateBack = { navController.popBackStack() })
+            }
         }
 
         composable("support") {
-            val currentUid = auth.currentUser?.uid
-            SupportChatScreen(
-                onNavigateBack = { navController.popBackStack() },
-                isAdmin = currentUid == ADMIN_UID
-            )
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                val currentUid = auth.currentUser?.uid
+                SupportChatScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    isAdmin = currentUid == ADMIN_UID
+                )
+            }
         }
 
         composable("support_inbox") {
@@ -159,26 +238,46 @@ fun AppNavigation(
         }
 
         composable("settings") {
-            SettingsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToProfile = { navController.navigate("profile") },
-                onNavigateToSupport = { navController.navigate("support") },
-                onLogout = {
-                    AuthRepository.signOut()
-                    navController.navigate("login") {
-                        popUpTo("home") { inclusive = true }
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
                     }
-                }
-            )
+                )
+            } else {
+                SettingsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToProfile = { navController.navigate("profile") },
+                    onNavigateToSupport = { navController.navigate("support") },
+                    onLogout = {
+                        AuthRepository.signOut()
+                        navController.navigate("login") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    }
+                )
+            }
         }
 
         composable("public_profile/{uid}") { backStackEntry ->
-            val uid = backStackEntry.arguments?.getString("uid") ?: return@composable
-            UserProfileScreen(
-                profileUid = uid,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
-            )
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                val uid = backStackEntry.arguments?.getString("uid") ?: return@composable
+                UserProfileScreen(
+                    profileUid = uid,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
+                )
+            }
         }
     }
 }

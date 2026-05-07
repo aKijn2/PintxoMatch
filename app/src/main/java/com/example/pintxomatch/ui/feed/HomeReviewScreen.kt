@@ -103,10 +103,12 @@ fun HomeReviewScreen(
     onNavigateToSupport: () -> Unit,
     onNavigateToSupportInbox: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToPublicProfile: (String) -> Unit
+    onNavigateToPublicProfile: (String) -> Unit,
+    onRequireAuth: () -> Unit
 ) {
     val auth = FirebaseAuth.getInstance()
     val firestore = FirebaseFirestore.getInstance()
+    val isGuest = auth.currentUser == null
 
     var pintxos by remember { mutableStateOf<List<Pintxo>>(emptyList()) }
     var selectedFooterTab by remember { mutableStateOf<String?>(null) }
@@ -181,6 +183,14 @@ fun HomeReviewScreen(
         alertMessage = message
     }
 
+    fun requireAuthOr(action: () -> Unit) {
+        if (isGuest) {
+            onRequireAuth()
+        } else {
+            action()
+        }
+    }
+
     fun extractRatings(snapshot: DocumentSnapshot): Map<String, Int> {
         val rawRatings = snapshot.get("ratings") as? Map<*, *> ?: return emptyMap()
         return rawRatings.entries.mapNotNull { (key, value) ->
@@ -233,11 +243,11 @@ fun HomeReviewScreen(
             }
     }
 
-    fun submitRating(pintxo: Pintxo, stars: Int) {
+    fun submitRating(pintxo: Pintxo, stars: Int): Boolean {
         val uid = auth.currentUser?.uid
         if (uid.isNullOrBlank()) {
-            notify("Inicia sesion para valorar")
-            return
+            onRequireAuth()
+            return false
         }
 
         val newRating = stars.coerceIn(1, 5)
@@ -302,6 +312,8 @@ fun HomeReviewScreen(
         }.addOnFailureListener {
             notify("No se pudo guardar la valoracion")
         }
+
+        return true
     }
 
     LaunchedEffect(Unit) {
@@ -348,7 +360,7 @@ fun HomeReviewScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
-                            onClick = onNavigateToSettings,
+                            onClick = { requireAuthOr(onNavigateToSettings) },
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh
                         ) {
@@ -386,7 +398,7 @@ fun HomeReviewScreen(
                         }
 
                         Surface(
-                            onClick = onNavigateToProfile,
+                            onClick = { requireAuthOr(onNavigateToProfile) },
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
@@ -498,7 +510,10 @@ fun HomeReviewScreen(
                                 icon = Icons.Default.Edit,
                                 label = "Reviews",
                                 selected = selectedFooterTab == "resenas",
-                                onClick = { selectedFooterTab = "resenas"; onNavigateToReviews() }
+                                onClick = {
+                                    selectedFooterTab = "resenas"
+                                    requireAuthOr(onNavigateToReviews)
+                                }
                             )
                             NavPillItem(
                                 icon = Icons.Default.Leaderboard,
@@ -527,7 +542,10 @@ fun HomeReviewScreen(
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null,
-                                        onClick = { selectedFooterTab = "subir"; onNavigateToUpload() }
+                                        onClick = {
+                                            selectedFooterTab = "subir"
+                                            requireAuthOr(onNavigateToUpload)
+                                        }
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -545,36 +563,38 @@ fun HomeReviewScreen(
                                 selected = selectedFooterTab == "mapa",
                                 onClick = { selectedFooterTab = "mapa"; onNavigateToNearby() }
                             )
-                            NavPillItem(
-                                icon = Icons.Default.SupportAgent,
-                                label = "Soporte",
-                                selected = selectedFooterTab == "soporte",
-                                onClick = {
-                                    selectedFooterTab = "soporte"
-                                    val uid = auth.currentUser?.uid
-                                    if (uid.isNullOrBlank()) {
-                                        notify("Inicia sesion para usar soporte")
-                                        return@NavPillItem
-                                    }
-                                    if (checkingSupportTicket) return@NavPillItem
-
-                                    checkingSupportTicket = true
-                                    coroutineScope.launch {
-                                        val alreadyHasTicket = try {
-                                            chatRepository.hasSupportTicket(uid)
-                                        } catch (_: Exception) {
-                                            false
+                            if (!isGuest) {
+                                NavPillItem(
+                                    icon = Icons.Default.SupportAgent,
+                                    label = "Soporte",
+                                    selected = selectedFooterTab == "soporte",
+                                    onClick = {
+                                        selectedFooterTab = "soporte"
+                                        val uid = auth.currentUser?.uid
+                                        if (uid.isNullOrBlank()) {
+                                            onRequireAuth()
+                                            return@NavPillItem
                                         }
+                                        if (checkingSupportTicket) return@NavPillItem
 
-                                        checkingSupportTicket = false
-                                        if (alreadyHasTicket) {
-                                            onNavigateToSupport()
-                                        } else {
-                                            showSupportTicketDialog = true
+                                        checkingSupportTicket = true
+                                        coroutineScope.launch {
+                                            val alreadyHasTicket = try {
+                                                chatRepository.hasSupportTicket(uid)
+                                            } catch (_: Exception) {
+                                                false
+                                            }
+
+                                            checkingSupportTicket = false
+                                            if (alreadyHasTicket) {
+                                                onNavigateToSupport()
+                                            } else {
+                                                showSupportTicketDialog = true
+                                            }
                                         }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
@@ -634,12 +654,13 @@ fun HomeReviewScreen(
                                 PintxoCard(
                                     pintxo = current,
                                     onRatePintxo = { stars ->
-                                        submitRating(current, stars)
-                                        // 2. Increment the trigger when rated!
-                                        starBurstTrigger++
+                                        if (submitRating(current, stars)) {
+                                            // 2. Increment the trigger when rated!
+                                            starBurstTrigger++
+                                        }
                                     },
                                     onUploaderClick = { uid ->
-                                        if (uid.isNotBlank()) onNavigateToPublicProfile(uid)
+                                        if (uid.isNotBlank()) requireAuthOr { onNavigateToPublicProfile(uid) }
                                         else notify("Este pintxo es antiguo y no tiene perfil asignado")
                                     }
                                 )
