@@ -45,9 +45,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.pintxomatch.data.repository.auth.AuthRepository
+import com.example.pintxomatch.data.repository.chat.ChatRepository
 import com.example.pintxomatch.data.repository.media.ImageRepository
+import com.example.pintxomatch.ui.common.components.ModernTopToast
+import com.example.pintxomatch.ui.support.SupportTicketDraftStore
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +63,8 @@ fun SettingsScreen(
     onLogout: () -> Unit
 ) {
     val user = AuthRepository.currentUser
+    val coroutineScope = rememberCoroutineScope()
+    val chatRepository = remember { ChatRepository() }
     val normalizedUserPhotoUrl = remember(user?.photoUrl?.toString()) {
         ImageRepository.normalizeImageUrlForCurrentProvider(user?.photoUrl?.toString())
     }
@@ -67,6 +74,43 @@ fun SettingsScreen(
     var notificationOptionsExpanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deletePassword by remember { mutableStateOf("") }
+    var showSupportTicketDialog by remember { mutableStateOf(false) }
+    var supportTicketTitle by remember { mutableStateOf("") }
+    var checkingSupportTicket by remember { mutableStateOf(false) }
+    var alertMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(alertMessage) {
+        if (alertMessage != null) {
+            delay(3000)
+            alertMessage = null
+        }
+    }
+
+    fun openSupportFlow() {
+        val currentUser = user
+        val uid = currentUser?.uid
+        if (uid.isNullOrBlank()) {
+            alertMessage = "Inicia sesion para usar soporte"
+            return
+        }
+        if (checkingSupportTicket) return
+
+        checkingSupportTicket = true
+        coroutineScope.launch {
+            val alreadyHasTicket = try {
+                chatRepository.hasSupportTicket(uid)
+            } catch (_: Exception) {
+                false
+            }
+
+            checkingSupportTicket = false
+            if (alreadyHasTicket) {
+                onNavigateToSupport()
+            } else {
+                showSupportTicketDialog = true
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -180,7 +224,7 @@ fun SettingsScreen(
                     SettingsActionRow(
                         icon = Icons.Default.SupportAgent,
                         label = "Soporte",
-                        onClick = onNavigateToSupport
+                        onClick = { openSupportFlow() }
                     )
                 }
 
@@ -334,6 +378,57 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showSupportTicketDialog) {
+        AlertDialog(
+            onDismissRequest = { showSupportTicketDialog = false },
+            title = { Text("Abrir ticket de soporte") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Describe el tema principal para abrir tu ticket.")
+                    OutlinedTextField(
+                        value = supportTicketTitle,
+                        onValueChange = { supportTicketTitle = it },
+                        singleLine = true,
+                        label = { Text("Titulo del ticket") },
+                        placeholder = { Text("Ej: Error al subir foto") }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val finalTitle = supportTicketTitle.trim()
+                        if (finalTitle.isBlank()) {
+                            alertMessage = "Escribe un titulo para continuar"
+                            return@TextButton
+                        }
+                        SupportTicketDraftStore.pendingTitle = finalTitle
+                        showSupportTicketDialog = false
+                        supportTicketTitle = ""
+                        onNavigateToSupport()
+                    }
+                ) {
+                    Text("Abrir ticket")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showSupportTicketDialog = false
+                        supportTicketTitle = ""
+                    }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    ModernTopToast(
+        message = alertMessage,
+        onDismiss = { alertMessage = null }
+    )
 }
 
 @Composable

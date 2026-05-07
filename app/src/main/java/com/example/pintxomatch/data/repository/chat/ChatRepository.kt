@@ -219,7 +219,10 @@ class ChatRepository {
     suspend fun hasSupportTicket(threadId: String): Boolean {
         if (threadId.isBlank()) return false
         val metaSnapshot = supportChatsRef.child(threadId).child("meta").get().await()
-        return metaSnapshot.exists()
+        if (!metaSnapshot.exists()) return false
+
+        val ticketTitle = metaSnapshot.child("ticketTitle").getValue(String::class.java).orEmpty().trim()
+        return ticketTitle.isNotBlank()
     }
 
     fun getSupportTicketTitleFlow(threadId: String): Flow<String> = callbackFlow {
