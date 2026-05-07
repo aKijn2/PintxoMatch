@@ -60,7 +60,7 @@ import com.example.pintxomatch.ui.gamification.components.GamificationProfileSec
 import com.example.pintxomatch.ui.gamification.components.WeeklyChallengeCard
 import com.example.pintxomatch.ui.gamification.GamificationViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.pintxomatch.ui.common.components.toBadgeCategoryKey
+import com.example.pintxomatch.ui.common.components.isBadgeCategoryUnlocked
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -548,7 +548,7 @@ fun UserProfileScreen(
                             Spacer(modifier = Modifier.height(16.dp))
                             
                             AchievementBentoGrid(
-                                totalPintxos = totalPintxos,
+                                level = gamificationState.level,
                                 unlockedBadges = gamificationState.badges
                             )
 
@@ -673,15 +673,14 @@ private fun DashboardContent(
 
 @Composable
 private fun AchievementBentoGrid(
-    totalPintxos: Int,
+    level: Int,
     unlockedBadges: List<String>
 ) {
-    val unlockedCategories = unlockedBadges.map { it.toBadgeCategoryKey() }.toSet()
     val achievements = listOf(
-        Triple(Icons.Default.Restaurant, "Critico", unlockedCategories.contains("critico") || totalPintxos >= 1),
-        Triple(Icons.Default.Star, "Estrella", unlockedCategories.contains("estrella") || totalPintxos >= 5),
-        Triple(Icons.Default.LocationOn, "Ruta", totalPintxos >= 10),
-        Triple(Icons.Default.Badge, "Leyenda", totalPintxos >= 50)
+        Triple(Icons.Default.Restaurant, "Critico", isBadgeCategoryUnlocked("critico", unlockedBadges, level)),
+        Triple(Icons.Default.Star, "Estrella", isBadgeCategoryUnlocked("estrella", unlockedBadges, level)),
+        Triple(Icons.Default.LocationOn, "Ruta", isBadgeCategoryUnlocked("ruta", unlockedBadges, level)),
+        Triple(Icons.Default.Badge, "Leyenda", isBadgeCategoryUnlocked("leyenda", unlockedBadges, level))
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

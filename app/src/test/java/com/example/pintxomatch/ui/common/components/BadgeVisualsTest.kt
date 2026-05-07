@@ -23,4 +23,17 @@ class BadgeVisualsTest {
 
         assertEquals(listOf("Critico", "Estrella"), labels)
     }
+
+    @Test
+    fun badgesWithLevelAchievements_addsExpectedLevelBadges() {
+        val labels = badgesWithLevelAchievements(emptyList(), level = 3).toUniqueBadgeDisplayLabels()
+
+        assertEquals(listOf("Critico", "Estrella", "Ruta"), labels)
+    }
+
+    @Test
+    fun isBadgeCategoryUnlocked_unlocksRutaAtLevelThree() {
+        assertEquals(true, isBadgeCategoryUnlocked("ruta", emptyList(), level = 3))
+        assertEquals(false, isBadgeCategoryUnlocked("ruta", emptyList(), level = 2))
+    }
 }

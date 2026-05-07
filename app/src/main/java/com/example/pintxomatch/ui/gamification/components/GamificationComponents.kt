@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.pintxomatch.ui.common.components.toBadgeDisplayLabel
+import com.example.pintxomatch.ui.common.components.badgesWithLevelAchievements
 import com.example.pintxomatch.ui.common.components.toUniqueBadgeDisplayLabels
 import com.example.pintxomatch.ui.common.components.triggerAchievementVibration
 import com.example.pintxomatch.ui.gamification.WeeklyChallengeUiItem
@@ -73,6 +74,7 @@ fun GamificationProfileSection(
 ) {
     val surfaceRed = Color(0xFFD32F2F)
     var debugSequenceTrigger by remember { mutableStateOf(0) }
+    val visibleBadges = badgesWithLevelAchievements(badges, level)
 
     val animatedProgress = animateFloatAsState(
         targetValue = levelProgress.coerceIn(0f, 1f),
@@ -148,7 +150,7 @@ fun GamificationProfileSection(
                     color = Color.White
                 )
 
-                if (badges.isEmpty()) {
+                if (visibleBadges.isEmpty()) {
                     Text(
                         text = "Aun no tienes badges. Completa retos semanales.",
                         style = MaterialTheme.typography.bodySmall,
@@ -156,7 +158,7 @@ fun GamificationProfileSection(
                     )
                 } else {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(badges.toUniqueBadgeDisplayLabels()) { badgeLabel ->
+                        items(visibleBadges.toUniqueBadgeDisplayLabels()) { badgeLabel ->
                             BadgePill(label = badgeLabel)
                         }
                     }
