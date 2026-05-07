@@ -2,7 +2,9 @@ package com.example.pintxomatch.ui.feed
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -312,46 +315,84 @@ fun HomeReviewScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFFFFDF7),
+                        Color(0xFFFFFAF2),
+                        Color(0xFFFFF6EC)
+                    )
+                )
+            )
+    ) {
         Scaffold(
+            containerColor = Color.Transparent,
             topBar = {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .statusBarsPadding(),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 2.dp
+                        .statusBarsPadding()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
+                    shadowElevation = 8.dp
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onNavigateToSettings) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = "Ajustes",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        Surface(
+                            onClick = onNavigateToSettings,
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            Box(
+                                modifier = Modifier.size(40.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = "Ajustes",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "DESCUBRE",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                letterSpacing = 1.4.sp
+                            )
+                            Text(
+                                text = "PintxoMatch",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Center,
+                                letterSpacing = 0.6.sp
                             )
                         }
-                        Text(
-                            text = "PintxoMatch",
-                            modifier = Modifier.weight(1f),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center,
-                            letterSpacing = 1.sp
-                        )
-                        IconButton(onClick = onNavigateToProfile) {
+
+                        Surface(
+                            onClick = onNavigateToProfile,
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .size(34.dp)
-                                    .background(
-                                        color = MaterialTheme.colorScheme.primaryContainer,
-                                        shape = CircleShape
-                                    )
+                                    .size(40.dp)
                                     .clip(CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -361,7 +402,7 @@ fun HomeReviewScreen(
                                         contentDescription = "Perfil",
                                         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                                         modifier = Modifier
-                                            .size(34.dp)
+                                            .size(40.dp)
                                             .clip(CircleShape),
                                         loading = {
                                             Icon(
@@ -424,13 +465,24 @@ fun HomeReviewScreen(
                         modifier = Modifier
                             .padding(horizontal = 20.dp)
                             .shadow(
-                                elevation = 20.dp,
+                                elevation = 12.dp,
                                 shape = RoundedCornerShape(32.dp),
-                                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+                                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
                             )
                             .background(
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.surfaceContainer,
+                                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        MaterialTheme.colorScheme.surfaceContainer
+                                    )
+                                ),
+                                shape = RoundedCornerShape(32.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
                                 shape = RoundedCornerShape(32.dp)
                             )
                             .fillMaxWidth()
@@ -457,14 +509,19 @@ fun HomeReviewScreen(
 
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(54.dp)
                                     .shadow(
-                                        elevation = 6.dp,
+                                        elevation = 8.dp,
                                         shape = CircleShape,
-                                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.26f)
                                     )
                                     .background(
-                                        color = MaterialTheme.colorScheme.primary,
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.88f)
+                                            )
+                                        ),
                                         shape = CircleShape
                                     )
                                     .clickable(
@@ -686,7 +743,15 @@ private fun NavPillItem(
                 indication = null,
                 onClick = onClick
             )
-            .background(color = bgColor, shape = RoundedCornerShape(20.dp))
+            .background(
+                color = bgColor,
+                shape = RoundedCornerShape(20.dp)
+            )
+            .border(
+                width = if (selected) 1.dp else 0.dp,
+                color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
+                shape = RoundedCornerShape(20.dp)
+            )
             .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
         Icon(

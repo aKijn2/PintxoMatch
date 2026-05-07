@@ -1,5 +1,6 @@
 package com.example.pintxomatch.ui.feed.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -46,12 +47,25 @@ fun PintxoCard(
     onRatePintxo: ((Int) -> Unit)? = null,
     onUploaderClick: ((String) -> Unit)? = null
 ) {
+    val priceLabel = if (pintxo.price > 0.0) {
+        String.format(Locale.US, "%.2f EUR", pintxo.price)
+    } else {
+        "S/P"
+    }
+    val ratingCountLabel = when (pintxo.ratingCount) {
+        1 -> "1 voto"
+        else -> "${pintxo.ratingCount} votos"
+    }
+    val uploaderLabel = pintxo.uploaderDisplayName.ifBlank { "Comunidad PintxoMatch" }
+    val barLabel = pintxo.barName.ifBlank { "Bar por descubrir" }
+    val locationLabel = pintxo.location.ifBlank { "Ubicacion pendiente" }
+    val placeLabel = "$barLabel - $locationLabel"
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
     ) {
-        // Full-bleed photo
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(pintxo.imageUrl)
@@ -63,7 +77,6 @@ fun PintxoCard(
             error = androidx.compose.ui.res.painterResource(android.R.drawable.ic_dialog_alert)
         )
 
-        // Gradient overlay (dark at bottom, transparent at top)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -72,15 +85,14 @@ fun PintxoCard(
                         colors = listOf(
                             Color.Transparent,
                             Color.Transparent,
-                            Color.Black.copy(alpha = 0.25f),
-                            Color.Black.copy(alpha = 0.75f),
-                            Color.Black.copy(alpha = 0.92f)
+                            Color.Black.copy(alpha = 0.20f),
+                            Color.Black.copy(alpha = 0.66f),
+                            Color.Black.copy(alpha = 0.90f)
                         )
                     )
                 )
         )
 
-        // Price pill (top-right)
         Surface(
             modifier = Modifier
                 .align(Alignment.TopEnd)
@@ -90,7 +102,7 @@ fun PintxoCard(
             shadowElevation = 4.dp
         ) {
             Text(
-                text = String.format(Locale.US, "%.2f €", pintxo.price),
+                text = priceLabel,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 15.sp,
@@ -98,14 +110,12 @@ fun PintxoCard(
             )
         }
 
-        // Average Rating badge (top-left)
         Surface(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(16.dp),
             shape = CircleShape,
-            color = Color.Black.copy(alpha = 0.6f),
-            shadowElevation = 0.dp
+            color = Color.Black.copy(alpha = 0.58f)
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -125,28 +135,25 @@ fun PintxoCard(
                     color = Color.White
                 )
                 Text(
-                    text = "(${pintxo.ratingCount})",
+                    text = "($ratingCountLabel)",
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.7f)
+                    color = Color.White.copy(alpha = 0.74f)
                 )
             }
         }
 
-        // Bottom info overlay
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Interactive Rating (Floating above info core)
             if (onRatePintxo != null) {
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = Color.White.copy(alpha = 0.12f),
                     modifier = Modifier
-                        .padding(bottom = 12.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
                 ) {
@@ -156,10 +163,10 @@ fun PintxoCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            "VALORAR", 
-                            fontSize = 10.sp, 
-                            fontWeight = FontWeight.Black, 
-                            color = Color.White.copy(alpha = 0.8f), 
+                            text = "VALORAR",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White.copy(alpha = 0.82f),
                             letterSpacing = 1.sp
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -167,7 +174,11 @@ fun PintxoCard(
                                 Icon(
                                     imageVector = Icons.Default.Star,
                                     contentDescription = "$starIndex",
-                                    tint = if (starIndex <= pintxo.userRating) Color(0xFFFFD700) else Color.White.copy(alpha = 0.3f),
+                                    tint = if (starIndex <= pintxo.userRating) {
+                                        Color(0xFFFFD700)
+                                    } else {
+                                        Color.White.copy(alpha = 0.30f)
+                                    },
                                     modifier = Modifier
                                         .size(24.dp)
                                         .clickable { onRatePintxo(starIndex) }
@@ -184,42 +195,74 @@ fun PintxoCard(
                 fontWeight = FontWeight.Black,
                 color = Color.White,
                 lineHeight = 32.sp,
-                letterSpacing = (-0.5).sp
+                letterSpacing = (-0.5).sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onUploaderClick?.invoke(pintxo.uploaderUid) }
-                    .padding(vertical = 4.dp)
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color.Black.copy(alpha = 0.26f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
             ) {
-                // Small Uploader Avatar
-                val hasPhoto = pintxo.uploaderPhotoUrl.isNotBlank()
-                AsyncImage(
-                    model = if (hasPhoto) pintxo.uploaderPhotoUrl else "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
-                    contentDescription = null,
+                Column(
                     modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.85f),
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = "${pintxo.barName} · ${pintxo.location}",
-                    fontSize = 14.sp,
-                    color = Color.White.copy(alpha = 0.85f),
-                    fontWeight = FontWeight.Bold
-                )
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onUploaderClick?.invoke(pintxo.uploaderUid) }
+                    ) {
+                        AsyncImage(
+                            model = if (pintxo.uploaderPhotoUrl.isNotBlank()) {
+                                pintxo.uploaderPhotoUrl
+                            } else {
+                                "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"
+                            },
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = uploaderLabel,
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.92f),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = placeLabel,
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.84f),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
         }
     }
