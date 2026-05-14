@@ -32,6 +32,8 @@ import androidx.core.content.FileProvider
 import com.example.pintxomatch.ui.common.components.ModernTopToast
 import com.example.pintxomatch.data.repository.media.ImageRepository
 import com.example.pintxomatch.data.repository.auth.AuthRepository
+import com.example.pintxomatch.data.repository.chat.ChatRepository
+import com.example.pintxomatch.data.model.friends.FriendRelationshipStatus
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
@@ -67,11 +69,14 @@ import com.example.pintxomatch.ui.common.components.isBadgeCategoryUnlocked
 fun UserProfileScreen(
     profileUid: String? = null,
     onNavigateBack: () -> Unit, 
-    onNavigateToUserPintxos: () -> Unit
+    onNavigateToUserPintxos: () -> Unit,
+    onNavigateToFriends: () -> Unit,
+    onOpenFriendChat: (String) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val userRepository = remember { com.example.pintxomatch.data.repository.user.UserRepository() }
+    val chatRepository = remember { ChatRepository() }
     val gamificationViewModel: GamificationViewModel = viewModel()
     val gamificationState by gamificationViewModel.uiState.collectAsState()
 
@@ -90,7 +95,7 @@ fun UserProfileScreen(
 
     // Estados adicionales para perfil publico
     var publicProfile by remember { mutableStateOf<com.example.pintxomatch.data.model.leaderboard.LeaderboardUser?>(null) }
-    var isFriend by remember { mutableStateOf(false) }
+    var friendRelationship by remember { mutableStateOf(FriendRelationshipStatus.NONE) }
     var loadingFriendAction by remember { mutableStateOf(false) }
     
     // Nuevos estados para ajustes de comentarios y amigos
@@ -179,7 +184,7 @@ fun UserProfileScreen(
             publicProfile = userRepository.getPublicProfile(targetUid)
             totalPintxos = publicProfile?.totalUploads ?: 0
             if (currentUserId != null) {
-                isFriend = userRepository.isFriend(currentUserId, targetUid)
+                friendRelationship = userRepository.getFriendRelationship(currentUserId, targetUid)
             }
             isLoading = false
         }
@@ -425,6 +430,11 @@ fun UserProfileScreen(
                                             user?.updateProfile(updates)?.await()
 
                                             if (user != null) {
+                                                userRepository.syncUserProfile(
+                                                    uid = user.uid,
+                                                    displayName = trimmedName,
+                                                    photoUrl = uploadedUrl.orEmpty()
+                                                )
                                                 userRepository.syncUploaderProfileToPintxos(
                                                     uid = user.uid,
                                                     displayName = trimmedName,
@@ -458,25 +468,125 @@ fun UserProfileScreen(
                                 level = gamificationState.level,
                                 progress = gamificationState.levelProgress,
                                 isMyProfile = isMyProfile,
-                                isFriend = isFriend,
-                                loadingFriend = loadingFriendAction,
                                 onAction = {
                                     if (isMyProfile) onNavigateToUserPintxos()
-                                    else if (currentUserId != null) {
-                                        coroutineScope.launch {
-                                            loadingFriendAction = true
-                                            if (isFriend) {
-                                                if (userRepository.removeFriend(currentUserId, targetUid)) isFriend = false
-                                            } else {
-                                                if (userRepository.addFriend(currentUserId, targetUid)) isFriend = true
-                                            }
-                                            loadingFriendAction = false
-                                        }
-                                    }
                                 }
                             )
 
                             Spacer(modifier = Modifier.height(28.dp))
+
+                            if (isMyProfile) {
+                                OutlinedButton(
+                                    onClick = onNavigateToFriends,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(20.dp)
+                                ) {
+                                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("VER AMIGOS Y SOLICITUDES")
+                                }
+                                Spacer(modifier = Modifier.height(28.dp))
+                            } else if (currentUserId != null) {
+                                FriendRelationshipPanel(
+                                    relationship = friendRelationship,
+                                    loading = loadingFriendAction,
+                                    onSendRequest = {
+                                        val me = user
+                                        if (me == null) return@FriendRelationshipPanel
+                                        val myName = me.displayName?.takeIf { it.isNotBlank() }
+                                            ?: me.email?.substringBefore("@")
+                                            ?: "Usuario"
+                                        val myPhoto = ImageRepository.normalizeImageUrlForCurrentProvider(me.photoUrl?.toString()).orEmpty()
+                                        coroutineScope.launch {
+                                            loadingFriendAction = true
+                                            if (userRepository.sendFriendRequest(currentUserId, targetUid, myName, myPhoto)) {
+                                                friendRelationship = FriendRelationshipStatus.OUTGOING_PENDING
+                                                alertMessage = "Solicitud enviada"
+                                            } else {
+                                                alertMessage = "No se pudo enviar la solicitud"
+                                            }
+                                            loadingFriendAction = false
+                                        }
+                                    },
+                                    onAcceptRequest = {
+                                        coroutineScope.launch {
+                                            loadingFriendAction = true
+                                            if (userRepository.acceptFriendRequest(currentUserId, targetUid)) {
+                                                friendRelationship = FriendRelationshipStatus.FRIENDS
+                                                friendsCount = userRepository.getFriendsCount(targetUid)
+                                                alertMessage = "Ahora sois amigos"
+                                            } else {
+                                                alertMessage = "No se pudo aceptar la solicitud"
+                                            }
+                                            loadingFriendAction = false
+                                        }
+                                    },
+                                    onRejectRequest = {
+                                        coroutineScope.launch {
+                                            loadingFriendAction = true
+                                            if (userRepository.rejectFriendRequest(currentUserId, targetUid)) {
+                                                friendRelationship = FriendRelationshipStatus.NONE
+                                                alertMessage = "Solicitud rechazada"
+                                            } else {
+                                                alertMessage = "No se pudo rechazar la solicitud"
+                                            }
+                                            loadingFriendAction = false
+                                        }
+                                    },
+                                    onCancelRequest = {
+                                        coroutineScope.launch {
+                                            loadingFriendAction = true
+                                            if (userRepository.cancelFriendRequest(currentUserId, targetUid)) {
+                                                friendRelationship = FriendRelationshipStatus.NONE
+                                                alertMessage = "Solicitud cancelada"
+                                            } else {
+                                                alertMessage = "No se pudo cancelar la solicitud"
+                                            }
+                                            loadingFriendAction = false
+                                        }
+                                    },
+                                    onRemoveFriend = {
+                                        coroutineScope.launch {
+                                            loadingFriendAction = true
+                                            if (userRepository.removeFriend(currentUserId, targetUid)) {
+                                                friendRelationship = FriendRelationshipStatus.NONE
+                                                friendsCount = userRepository.getFriendsCount(targetUid)
+                                                alertMessage = "Amigo eliminado"
+                                            } else {
+                                                alertMessage = "No se pudo eliminar al amigo"
+                                            }
+                                            loadingFriendAction = false
+                                        }
+                                    },
+                                    onOpenChat = {
+                                        val me = user ?: return@FriendRelationshipPanel
+                                        val myName = me.displayName?.takeIf { it.isNotBlank() }
+                                            ?: me.email?.substringBefore("@")
+                                            ?: "Usuario"
+                                        val myPhoto = ImageRepository.normalizeImageUrlForCurrentProvider(me.photoUrl?.toString()).orEmpty()
+                                        val targetName = publicProfile?.displayName ?: "Usuario"
+                                        val targetPhoto = ImageRepository.normalizeImageUrlForCurrentProvider(publicProfile?.profileImageUrl).orEmpty()
+                                        coroutineScope.launch {
+                                            loadingFriendAction = true
+                                            val chatId = chatRepository.createOrGetDirectChat(
+                                                currentUid = currentUserId,
+                                                currentDisplayName = myName,
+                                                currentPhotoUrl = myPhoto,
+                                                targetUid = targetUid,
+                                                targetDisplayName = targetName,
+                                                targetPhotoUrl = targetPhoto
+                                            )
+                                            loadingFriendAction = false
+                                            if (chatId.isNotBlank()) {
+                                                onOpenFriendChat(chatId)
+                                            } else {
+                                                alertMessage = "No se pudo abrir el chat"
+                                            }
+                                        }
+                                    }
+                                )
+                                Spacer(modifier = Modifier.height(28.dp))
+                            }
 
                             GamificationProfileSection(
                                 xp = gamificationState.xp,
@@ -578,8 +688,6 @@ private fun DashboardContent(
     level: Int,
     progress: Float,
     isMyProfile: Boolean,
-    isFriend: Boolean,
-    loadingFriend: Boolean,
     onAction: () -> Unit
 ) {
     val colorPrimary = MaterialTheme.colorScheme.primary
@@ -587,6 +695,8 @@ private fun DashboardContent(
     val colorOnSurface = MaterialTheme.colorScheme.onSurface
     val colorOnSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val colorContainer = MaterialTheme.colorScheme.surfaceContainerHigh
+    val isFriend = false
+    val loadingFriend = false
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Stats Grid
@@ -644,6 +754,7 @@ private fun DashboardContent(
             }
         }
 
+        if (isMyProfile) {
         // Action Button
         Button(
             onClick = onAction,
@@ -666,6 +777,136 @@ private fun DashboardContent(
                 Icon(icon, null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(label, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+            }
+        }
+        }
+    }
+}
+
+@Composable
+private fun FriendRelationshipPanel(
+    relationship: FriendRelationshipStatus,
+    loading: Boolean,
+    onSendRequest: () -> Unit,
+    onAcceptRequest: () -> Unit,
+    onRejectRequest: () -> Unit,
+    onCancelRequest: () -> Unit,
+    onRemoveFriend: () -> Unit,
+    onOpenChat: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "CONEXION SOCIAL",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.sp
+            )
+
+            Text(
+                text = when (relationship) {
+                    FriendRelationshipStatus.NONE -> "Puedes enviar una solicitud para conectar y hablar."
+                    FriendRelationshipStatus.OUTGOING_PENDING -> "Tu solicitud esta enviada y pendiente de aceptacion."
+                    FriendRelationshipStatus.INCOMING_PENDING -> "Esta persona quiere ser tu amiga."
+                    FriendRelationshipStatus.FRIENDS -> "Ya sois amigos y podeis hablar por chat."
+                    FriendRelationshipStatus.SELF -> ""
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            when (relationship) {
+                FriendRelationshipStatus.NONE -> {
+                    Button(
+                        onClick = onSendRequest,
+                        enabled = !loading,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        if (loading) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ENVIAR SOLICITUD")
+                        }
+                    }
+                }
+                FriendRelationshipStatus.OUTGOING_PENDING -> {
+                    OutlinedButton(
+                        onClick = onCancelRequest,
+                        enabled = !loading,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        if (loading) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("CANCELAR SOLICITUD")
+                        }
+                    }
+                }
+                FriendRelationshipStatus.INCOMING_PENDING -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = onAcceptRequest,
+                            enabled = !loading,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            if (loading) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("ACEPTAR")
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = onRejectRequest,
+                            enabled = !loading,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Text("RECHAZAR")
+                        }
+                    }
+                }
+                FriendRelationshipStatus.FRIENDS -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = onOpenChat,
+                            enabled = !loading,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            if (loading) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("HABLAR")
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = onRemoveFriend,
+                            enabled = !loading,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(20.dp)
+                        ) {
+                            Text("QUITAR")
+                        }
+                    }
+                }
+                FriendRelationshipStatus.SELF -> Unit
             }
         }
     }

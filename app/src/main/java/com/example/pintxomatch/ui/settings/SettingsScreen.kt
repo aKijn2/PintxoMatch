@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -84,6 +85,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToProfile: () -> Unit,
+    onNavigateToFriends: () -> Unit,
     onNavigateToSupport: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -331,6 +333,13 @@ fun SettingsScreen(
                     }
 
                     SettingsGroup(title = "Cuenta") {
+                        SettingsActionRow(
+                            icon = Icons.Default.Groups,
+                            label = "Amigos",
+                            subtitle = "Solicitudes, estados y chat con tu gente",
+                            onClick = onNavigateToFriends
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
                         SettingsActionRow(
                             icon = Icons.Default.Person,
                             label = "Ver perfil",

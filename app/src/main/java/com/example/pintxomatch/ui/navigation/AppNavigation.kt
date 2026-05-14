@@ -7,13 +7,18 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.pintxomatch.data.repository.auth.AuthRepository
 import com.example.pintxomatch.ui.auth.LoginScreen
+import com.example.pintxomatch.ui.chat.ChatScreen
+import com.example.pintxomatch.data.repository.media.ImageRepository
+import com.example.pintxomatch.data.repository.user.UserRepository
 import com.example.pintxomatch.ui.feed.HomeReviewScreen
+import com.example.pintxomatch.ui.friends.FriendsScreen
 import com.example.pintxomatch.ui.leaderboard.LeaderboardScreen
 import com.example.pintxomatch.ui.map.NearbyRestaurantsScreen
 import com.example.pintxomatch.ui.pintxo.EditPintxoScreen
@@ -34,10 +39,22 @@ fun AppNavigation(
     navController: NavHostController = rememberNavController()
 ) {
     val auth = FirebaseAuth.getInstance()
+    val userRepository = remember { UserRepository() }
     val startScreen = "home"
 
     LaunchedEffect(auth.currentUser?.uid) {
         val uid = auth.currentUser?.uid
+        val currentUser = auth.currentUser
+        if (!uid.isNullOrBlank() && currentUser != null) {
+            val displayName = currentUser.displayName?.takeIf { it.isNotBlank() }
+                ?: currentUser.email?.substringBefore("@")
+                ?: "Usuario"
+            val photoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(currentUser.photoUrl?.toString()).orEmpty()
+            try {
+                userRepository.syncUserProfile(uid, displayName, photoUrl)
+            } catch (_: Exception) {
+            }
+        }
         if (uid == ADMIN_UID) {
             FirebaseDatabase.getInstance(PINTXO_MATCH_RTDB_URL)
                 .getReference("admins")
@@ -111,7 +128,9 @@ fun AppNavigation(
             } else {
                 UserProfileScreen(
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
+                    onNavigateToUserPintxos = { navController.navigate("user_pintxos") },
+                    onNavigateToFriends = { navController.navigate("friends") },
+                    onOpenFriendChat = { chatId -> navController.navigate("chat/$chatId") }
                 )
             }
         }
@@ -250,6 +269,7 @@ fun AppNavigation(
                 SettingsScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToProfile = { navController.navigate("profile") },
+                    onNavigateToFriends = { navController.navigate("friends") },
                     onNavigateToSupport = { navController.navigate("support") },
                     onLogout = {
                         AuthRepository.signOut()
@@ -275,7 +295,45 @@ fun AppNavigation(
                 UserProfileScreen(
                     profileUid = uid,
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToUserPintxos = { navController.navigate("user_pintxos") }
+                    onNavigateToUserPintxos = { navController.navigate("user_pintxos") },
+                    onNavigateToFriends = { navController.navigate("friends") },
+                    onOpenFriendChat = { chatId -> navController.navigate("chat/$chatId") }
+                )
+            }
+        }
+
+        composable("friends") {
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                FriendsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenChat = { chatId -> navController.navigate("chat/$chatId") },
+                    onOpenProfile = { uid -> navController.navigate("public_profile/$uid") }
+                )
+            }
+        }
+
+        composable("chat/{chatId}") { backStackEntry ->
+            if (auth.currentUser == null) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                val chatId = backStackEntry.arguments?.getString("chatId") ?: return@composable
+                ChatScreen(
+                    chatId = chatId,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
         }

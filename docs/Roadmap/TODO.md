@@ -53,3 +53,4 @@ Para escalar la app, la base técnica debe ser sólida y el contenido debe estar
 * Configura reintentos automáticos (*exponential backoff*) para cuando falle la red.
 * Mejora el manejo del modo sin conexión (avisa al usuario de forma elegante si no hay internet).
 * Añade eventos de analíticas y reporte de *crashes* en los flujos críticos (subida de fotos y reseñas).
+
