@@ -1,5 +1,6 @@
 param(
-    [int]$TunnelTimeoutSeconds = 30
+    [int]$TunnelTimeoutSeconds = 30,
+    [switch]$SkipDefaultResolverCheck
 )
 
 $ErrorActionPreference = "Stop"
@@ -109,12 +110,17 @@ function Wait-ForHealth {
 function Wait-ForDnsResolution {
     param(
         [string]$Hostname,
-        [int]$TimeoutSeconds = 60
+        [int]$TimeoutSeconds = 60,
+        [switch]$DefaultResolverOnly
     )
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $lastError = $null
-    $dnsServers = @($null, "1.1.1.1", "8.8.8.8")
+    $dnsServers = if ($DefaultResolverOnly) {
+        @($null)
+    } else {
+        @($null, "1.1.1.1", "8.8.8.8")
+    }
 
     while ((Get-Date) -lt $deadline) {
         foreach ($dnsServer in $dnsServers) {
@@ -173,24 +179,6 @@ function Wait-ForPublicHealth {
         }
         catch {
             $lastError = $_
-
-            try {
-                $addresses = Get-ResolvedAddresses -Hostname $hostname
-
-                if ($addresses -and (Get-Command "curl.exe" -ErrorAction SilentlyContinue)) {
-                    foreach ($address in $addresses) {
-                        $resolveArg = "${hostname}:$($uriObject.Port):$address"
-                        $response = curl.exe --silent --show-error --fail --connect-timeout 5 --max-time 8 --resolve $resolveArg $Uri
-                        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($response)) {
-                            return $response | ConvertFrom-Json
-                        }
-                    }
-                }
-            }
-            catch {
-                $lastError = $_
-            }
-
             Start-Sleep -Milliseconds 700
         }
     }
@@ -200,6 +188,18 @@ function Wait-ForPublicHealth {
     }
 
     throw "Timed out waiting for public health endpoint: $Uri"
+}
+
+function Assert-ProcessAlive {
+    param(
+        [int]$ProcessId,
+        [string]$ProcessNameForMessage = "process"
+    )
+
+    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if (-not $process) {
+        throw "$ProcessNameForMessage exited unexpectedly before setup completed."
+    }
 }
 
 function Get-PropertyValue {
@@ -277,13 +277,24 @@ try {
     Write-Host "Waiting for public DNS propagation for $tunnelHostname..."
     Wait-ForDnsResolution -Hostname $tunnelHostname -TimeoutSeconds ([Math]::Max($TunnelTimeoutSeconds, 60)) | Out-Null
 
+    if (-not $SkipDefaultResolverCheck) {
+        Write-Host "Waiting for default DNS resolver to recognize $tunnelHostname..."
+        Wait-ForDnsResolution -Hostname $tunnelHostname -TimeoutSeconds ([Math]::Max($TunnelTimeoutSeconds, 60)) -DefaultResolverOnly | Out-Null
+    }
+    else {
+        Write-Warning "Skipping default DNS resolver check. The tunnel may still fail on devices that cannot resolve trycloudflare.com yet."
+    }
+
     $env:PUBLIC_BASE_URL = $tunnelUrl
     Write-Host "Recreating image server with updated PUBLIC_BASE_URL..."
     docker compose -f $composeFile up -d --force-recreate | Out-Null
 
+    Assert-ProcessAlive -ProcessId $cloudflaredProcess.Id -ProcessNameForMessage "cloudflared"
     $health = Wait-ForHealth -Uri "http://localhost:8080/health" -TimeoutSeconds 40
     Start-Sleep -Seconds 2
+    Assert-ProcessAlive -ProcessId $cloudflaredProcess.Id -ProcessNameForMessage "cloudflared"
     $publicHealth = Wait-ForPublicHealth -Uri "$tunnelUrl/health" -TimeoutSeconds ([Math]::Max($TunnelTimeoutSeconds, 60))
+    Assert-ProcessAlive -ProcessId $cloudflaredProcess.Id -ProcessNameForMessage "cloudflared"
 
     Set-Or-AppendProperty -FilePath $localPropertiesPath -Key "LOCAL_IMAGE_BASE_URL" -Value $tunnelUrl
 
@@ -299,8 +310,8 @@ try {
     Write-Host "Ready."
     Write-Host "- LOCAL_IMAGE_BASE_URL updated in local.properties"
     Write-Host "- PUBLIC_BASE_URL set in image server container"
-    Write-Host "- Health check: $($health.status)"
-    Write-Host "- Public health check: $($publicHealth.status)"
+    Write-Host "- Health check ok: $($health.ok)"
+    Write-Host "- Public health check ok: $($publicHealth.ok)"
     Write-Host "- cloudflared PID: $($cloudflaredProcess.Id)"
     Write-Host "- Log file: $cloudflaredLogPath"
     Write-Host "- Error log file: $cloudflaredErrLogPath"
@@ -308,6 +319,12 @@ try {
     Write-Host "Rebuild and run your Android app now so BuildConfig picks up the latest URL."
 }
 catch {
+    if ($cloudflaredProcess -and $cloudflaredProcess.Id) {
+        $failedProcess = Get-Process -Id $cloudflaredProcess.Id -ErrorAction SilentlyContinue
+        if ($failedProcess) {
+            Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
     if ($previousLocalImageBaseUrl) {
         Set-Or-AppendProperty -FilePath $localPropertiesPath -Key "LOCAL_IMAGE_BASE_URL" -Value $previousLocalImageBaseUrl
     }
