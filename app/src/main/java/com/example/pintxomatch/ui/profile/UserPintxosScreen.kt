@@ -5,11 +5,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,6 +42,7 @@ fun UserPintxosScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
+    var isGridView by remember { mutableStateOf(false) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
 
     val colorBackground = MaterialTheme.colorScheme.background
@@ -63,6 +69,14 @@ fun UserPintxosScreen(
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { isGridView = !isGridView }) {
+                            Icon(
+                                imageVector = if (isGridView) Icons.Default.ViewAgenda else Icons.Default.GridView,
+                                contentDescription = if (isGridView) "Vista lista" else "Vista rejilla"
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -176,59 +190,95 @@ fun UserPintxosScreen(
                                     }
                                 }
                             } else {
-                                items(filteredPintxos) { pintxo ->
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .widthIn(max = 760.dp)
-                                            .clickable { onNavigateToEdit(pintxo.id) },
-                                        shape = RoundedCornerShape(20.dp),
-                                        color = MaterialTheme.colorScheme.surface,
-                                        border = BorderStroke(
-                                            1.dp,
-                                            colorOnSurfaceVariant.copy(alpha = 0.12f)
-                                        ),
-                                        shadowElevation = 1.dp
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(14.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                if (isGridView) {
+                                    item {
+                                        LazyVerticalGrid(
+                                            columns = GridCells.Fixed(4),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(min = 120.dp, max = 1200.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            userScrollEnabled = false
                                         ) {
-                                            AsyncImage(
-                                                model = pintxo.imageUrl.takeIf { it.isNotBlank() },
-                                                contentDescription = pintxo.name,
-                                                modifier = Modifier
-                                                    .size(68.dp)
-                                                    .clip(RoundedCornerShape(14.dp)),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    pintxo.name,
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                                Text(
-                                                    pintxo.barName,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = colorOnSurfaceVariant
-                                                )
-                                            }
-                                            Surface(
-                                                shape = RoundedCornerShape(12.dp),
-                                                color = colorPrimary.copy(alpha = 0.10f),
-                                                border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.22f))
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Edit,
-                                                    contentDescription = "Editar",
-                                                    tint = colorPrimary,
+                                            items(filteredPintxos) { pintxo ->
+                                                Surface(
                                                     modifier = Modifier
-                                                        .padding(8.dp)
-                                                        .size(18.dp)
+                                                        .aspectRatio(1f)
+                                                        .clickable { onNavigateToEdit(pintxo.id) },
+                                                    shape = RoundedCornerShape(14.dp),
+                                                    color = MaterialTheme.colorScheme.surface,
+                                                    border = BorderStroke(
+                                                        1.dp,
+                                                        colorOnSurfaceVariant.copy(alpha = 0.12f)
+                                                    ),
+                                                    shadowElevation = 1.dp
+                                                ) {
+                                                    AsyncImage(
+                                                        model = pintxo.imageUrl.takeIf { it.isNotBlank() },
+                                                        contentDescription = pintxo.name,
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    items(filteredPintxos) { pintxo ->
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .widthIn(max = 760.dp)
+                                                .clickable { onNavigateToEdit(pintxo.id) },
+                                            shape = RoundedCornerShape(20.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            border = BorderStroke(
+                                                1.dp,
+                                                colorOnSurfaceVariant.copy(alpha = 0.12f)
+                                            ),
+                                            shadowElevation = 1.dp
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(14.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                            ) {
+                                                AsyncImage(
+                                                    model = pintxo.imageUrl.takeIf { it.isNotBlank() },
+                                                    contentDescription = pintxo.name,
+                                                    modifier = Modifier
+                                                        .size(68.dp)
+                                                        .clip(RoundedCornerShape(14.dp)),
+                                                    contentScale = ContentScale.Crop
                                                 )
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        pintxo.name,
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        pintxo.barName,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = colorOnSurfaceVariant
+                                                    )
+                                                }
+                                                Surface(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = colorPrimary.copy(alpha = 0.10f),
+                                                    border = BorderStroke(1.dp, colorPrimary.copy(alpha = 0.22f))
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Edit,
+                                                        contentDescription = "Editar",
+                                                        tint = colorPrimary,
+                                                        modifier = Modifier
+                                                            .padding(8.dp)
+                                                            .size(18.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
