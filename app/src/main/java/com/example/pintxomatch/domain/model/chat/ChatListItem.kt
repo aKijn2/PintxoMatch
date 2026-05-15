@@ -5,5 +5,6 @@ data class ChatListItem(
     val title: String,
     val lastMessage: String,
     val lastTimestamp: Long,
-    val messageCount: Int
+    val messageCount: Int,
+    val lastSenderId: String
 )

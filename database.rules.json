@@ -15,6 +15,18 @@
         }
       }
     },
+    "user_inbox": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "chatAlerts": {
+          "$chatId": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && root.child('chats').child($chatId).child('participants').child(auth.uid).val() === true && root.child('chats').child($chatId).child('participants').child($uid).val() === true",
+            ".validate": "newData.hasChildren(['title','body','senderId','timestamp']) && newData.child('title').isString() && newData.child('body').isString() && newData.child('senderId').isString() && newData.child('timestamp').isNumber()"
+          }
+        }
+      }
+    },
     "chats": {
       "$chatId": {
         ".read": "auth != null && (!data.exists() || data.child('participants').child(auth.uid).val() === true)",

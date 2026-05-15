@@ -5,18 +5,27 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.pintxomatch.data.repository.auth.AuthRepository
+import com.example.pintxomatch.data.repository.chat.ChatRepository
 import com.example.pintxomatch.ui.auth.LoginScreen
 import com.example.pintxomatch.ui.chat.ChatScreen
 import com.example.pintxomatch.data.repository.media.ImageRepository
 import com.example.pintxomatch.data.repository.user.UserRepository
+import com.example.pintxomatch.notifications.NotificationHelper
+import com.example.pintxomatch.notifications.PushTokenManager
 import com.example.pintxomatch.ui.feed.HomeReviewScreen
 import com.example.pintxomatch.ui.friends.FriendsScreen
 import com.example.pintxomatch.ui.leaderboard.LeaderboardScreen
@@ -40,7 +49,49 @@ fun AppNavigation(
 ) {
     val auth = FirebaseAuth.getInstance()
     val userRepository = remember { UserRepository() }
+    val chatRepository = remember { ChatRepository() }
     val startScreen = "home"
+    val context = LocalContext.current
+    val currentBackStackEntry = navController.currentBackStackEntryAsState().value
+    val activeRoute = currentBackStackEntry?.destination?.route
+    val activeChatId = currentBackStackEntry?.arguments?.getString("chatId")
+        ?: activeRoute?.takeIf { it.startsWith("chat/") }?.substringAfter("chat/")
+    val activeChatIdState = rememberUpdatedState(activeChatId)
+
+    LaunchedEffect(auth.currentUser?.uid) {
+        val uid = auth.currentUser?.uid ?: return@LaunchedEffect
+        var hasInitialSnapshot = false
+        val knownTimestamps = mutableMapOf<String, Long>()
+
+        try {
+            chatRepository.getIncomingChatAlertsFlow(uid).collect { alerts ->
+                if (!hasInitialSnapshot) {
+                    alerts.forEach { alert -> knownTimestamps[alert.chatId] = alert.timestamp }
+                    hasInitialSnapshot = true
+                    return@collect
+                }
+
+                alerts.forEach { alert ->
+                    val previousTimestamp = knownTimestamps[alert.chatId] ?: 0L
+                    val isNewMessage = alert.timestamp > previousTimestamp
+                    val isIncoming = alert.senderId.isNotBlank() && alert.senderId != uid
+                    val isCurrentChatOpen = activeChatIdState.value == alert.chatId
+
+                    if (isNewMessage && isIncoming && !isCurrentChatOpen) {
+                        NotificationHelper.showChatNotification(
+                            context = context,
+                            title = alert.title,
+                            body = alert.body,
+                            chatId = alert.chatId
+                        )
+                    }
+
+                    knownTimestamps[alert.chatId] = alert.timestamp
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
 
     LaunchedEffect(auth.currentUser?.uid) {
         val uid = auth.currentUser?.uid
@@ -52,6 +103,7 @@ fun AppNavigation(
             val photoUrl = ImageRepository.normalizeImageUrlForCurrentProvider(currentUser.photoUrl?.toString()).orEmpty()
             try {
                 userRepository.syncUserProfile(uid, displayName, photoUrl)
+                PushTokenManager.syncCurrentUserToken()
             } catch (_: Exception) {
             }
         }
@@ -63,14 +115,15 @@ fun AppNavigation(
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = startScreen,
-        enterTransition = { fadeIn(animationSpec = tween(260)) + slideInHorizontally { it / 4 } },
-        exitTransition = { fadeOut(animationSpec = tween(200)) + slideOutHorizontally { -it / 4 } },
-        popEnterTransition = { fadeIn(animationSpec = tween(260)) + slideInHorizontally { -it / 4 } },
-        popExitTransition = { fadeOut(animationSpec = tween(200)) + slideOutHorizontally { it / 4 } }
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = startScreen,
+            enterTransition = { fadeIn(animationSpec = tween(260)) + slideInHorizontally { it / 4 } },
+            exitTransition = { fadeOut(animationSpec = tween(200)) + slideOutHorizontally { -it / 4 } },
+            popEnterTransition = { fadeIn(animationSpec = tween(260)) + slideInHorizontally { -it / 4 } },
+            popExitTransition = { fadeOut(animationSpec = tween(200)) + slideOutHorizontally { it / 4 } }
+        ) {
         composable("login") {
             LoginScreen(
                 onLoginSuccess = {
@@ -336,6 +389,7 @@ fun AppNavigation(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
+        }
         }
     }
 }

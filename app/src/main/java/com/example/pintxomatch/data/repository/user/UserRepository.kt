@@ -30,6 +30,32 @@ class UserRepository {
         ).await()
     }
 
+    suspend fun saveDeviceToken(uid: String, token: String) {
+        if (uid.isBlank() || token.isBlank()) return
+
+        userDoc(uid)
+            .collection("deviceTokens")
+            .document(token)
+            .set(
+                mapOf(
+                    "token" to token,
+                    "platform" to "android",
+                    "updatedAt" to System.currentTimeMillis()
+                )
+            )
+            .await()
+    }
+
+    suspend fun removeDeviceToken(uid: String, token: String) {
+        if (uid.isBlank() || token.isBlank()) return
+
+        userDoc(uid)
+            .collection("deviceTokens")
+            .document(token)
+            .delete()
+            .await()
+    }
+
     suspend fun updatePresenceStatus(uid: String, status: PresenceStatus): Boolean {
         return try {
             userDoc(uid).set(

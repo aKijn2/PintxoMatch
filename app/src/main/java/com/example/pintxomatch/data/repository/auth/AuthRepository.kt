@@ -1,7 +1,11 @@
 package com.example.pintxomatch.data.repository.auth
 
+import com.example.pintxomatch.data.repository.user.UserRepository
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.tasks.await
 
 object AuthRepository {
     val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
@@ -16,6 +20,16 @@ object AuthRepository {
         get() = auth.currentUser?.email
 
     fun signOut() {
+        val uid = currentUserId
+        if (!uid.isNullOrBlank()) {
+            runBlocking {
+                try {
+                    val token = FirebaseMessaging.getInstance().token.await()
+                    UserRepository().removeDeviceToken(uid, token)
+                } catch (_: Exception) {
+                }
+            }
+        }
         auth.signOut()
     }
     

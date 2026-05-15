@@ -17,6 +17,15 @@ class ChatRepository {
     private val database = FirebaseDatabase.getInstance(PINTXO_MATCH_RTDB_URL)
     private val chatsRef = database.getReference("chats")
     private val supportChatsRef = database.getReference("support_chats")
+    private val userInboxRef = database.getReference("user_inbox")
+
+    data class IncomingChatAlert(
+        val chatId: String,
+        val title: String,
+        val body: String,
+        val senderId: String,
+        val timestamp: Long
+    )
 
     fun getUserChatsFlow(currentUid: String): Flow<List<ChatListItem>> = callbackFlow {
         val listener = object : ValueEventListener {
@@ -59,7 +68,8 @@ class ChatRepository {
                             title = title,
                             lastMessage = lastMsg?.text ?: "Sin mensajes todavia",
                             lastTimestamp = lastMsg?.timestamp ?: 0L,
-                            messageCount = parsedMessages.size
+                            messageCount = parsedMessages.size,
+                            lastSenderId = lastMsg?.senderId.orEmpty()
                         )
                     )
                 }
@@ -154,6 +164,35 @@ class ChatRepository {
         awaitClose { ref.removeEventListener(listener) }
     }
 
+    fun getIncomingChatAlertsFlow(currentUid: String): Flow<List<IncomingChatAlert>> = callbackFlow {
+        val ref = userInboxRef.child(currentUid).child("chatAlerts")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val alerts = snapshot.children.mapNotNull { node ->
+                    val chatId = node.key ?: return@mapNotNull null
+                    val title = node.child("title").getValue(String::class.java).orEmpty()
+                    val body = node.child("body").getValue(String::class.java).orEmpty()
+                    val senderId = node.child("senderId").getValue(String::class.java).orEmpty()
+                    val timestamp = node.child("timestamp").getValue(Long::class.java) ?: 0L
+                    IncomingChatAlert(
+                        chatId = chatId,
+                        title = title,
+                        body = body,
+                        senderId = senderId,
+                        timestamp = timestamp
+                    )
+                }.sortedByDescending { it.timestamp }
+                trySend(alerts)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                close(error.toException())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
+
     suspend fun updateChatMetadataAndValidateAccess(
         chatId: String,
         currentUid: String,
@@ -217,6 +256,29 @@ class ChatRepository {
         chatsRef.child(chatId).child("participantNames").child(currentUid).setValue(senderName).await()
         if (senderPhoto.isNotBlank()) {
             chatsRef.child(chatId).child("participantPhotos").child(currentUid).setValue(senderPhoto).await()
+        }
+
+        val recipients = chatSnapshot.child("participants").children
+            .mapNotNull { it.key }
+            .filter { it != currentUid }
+
+        recipients.forEach { recipientUid ->
+            val recipientTitle = if (
+                chatSnapshot.child("chatType").getValue(String::class.java).orEmpty() == "friend_direct"
+            ) {
+                senderName
+            } else {
+                chatSnapshot.child("pintxoName").getValue(String::class.java) ?: "Nuevo mensaje"
+            }
+
+            userInboxRef.child(recipientUid).child("chatAlerts").child(chatId).setValue(
+                mapOf(
+                    "title" to recipientTitle,
+                    "body" to text,
+                    "senderId" to currentUid,
+                    "timestamp" to System.currentTimeMillis()
+                )
+            ).await()
         }
     }
 

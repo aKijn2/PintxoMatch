@@ -94,4 +94,5 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore") // Base de datos (texto, precios, coordenadas)
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")
+    implementation("com.google.firebase:firebase-messaging")
 }
