@@ -326,8 +326,9 @@ fun AppNavigation(
                     onNavigateToSupport = { navController.navigate("support") },
                     onLogout = {
                         AuthRepository.signOut()
-                        navController.navigate("login") {
-                            popUpTo("home") { inclusive = true }
+                        navController.navigate("home") {
+                            popUpTo(0) { inclusive = true }
+                            launchSingleTop = true
                         }
                     }
                 )
