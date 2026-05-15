@@ -290,19 +290,24 @@ fun FriendsScreen(
                                     val myPhoto = ImageRepository.normalizeImageUrlForCurrentProvider(user?.photoUrl?.toString()).orEmpty()
                                     coroutineScope.launch {
                                         busyActionUid = friend.uid
-                                        val chatId = chatRepository.createOrGetDirectChat(
-                                            currentUid = currentUid.orEmpty(),
-                                            currentDisplayName = myName,
-                                            currentPhotoUrl = myPhoto,
-                                            targetUid = friend.uid,
-                                            targetDisplayName = friend.displayName,
-                                            targetPhotoUrl = friend.photoUrl
-                                        )
-                                        busyActionUid = null
-                                        if (chatId.isNotBlank()) {
-                                            onOpenChat(chatId)
-                                        } else {
-                                            alertMessage = "No se pudo abrir el chat"
+                                        try {
+                                            val chatId = chatRepository.createOrGetDirectChat(
+                                                currentUid = currentUid.orEmpty(),
+                                                currentDisplayName = myName,
+                                                currentPhotoUrl = myPhoto,
+                                                targetUid = friend.uid,
+                                                targetDisplayName = friend.displayName,
+                                                targetPhotoUrl = friend.photoUrl
+                                            )
+                                            if (chatId.isNotBlank()) {
+                                                onOpenChat(chatId)
+                                            } else {
+                                                alertMessage = "No se pudo abrir el chat"
+                                            }
+                                        } catch (e: Exception) {
+                                            alertMessage = e.message ?: "No se pudo abrir el chat"
+                                        } finally {
+                                            busyActionUid = null
                                         }
                                     }
                                 },

@@ -568,19 +568,24 @@ fun UserProfileScreen(
                                         val targetPhoto = ImageRepository.normalizeImageUrlForCurrentProvider(publicProfile?.profileImageUrl).orEmpty()
                                         coroutineScope.launch {
                                             loadingFriendAction = true
-                                            val chatId = chatRepository.createOrGetDirectChat(
-                                                currentUid = currentUserId,
-                                                currentDisplayName = myName,
-                                                currentPhotoUrl = myPhoto,
-                                                targetUid = targetUid,
-                                                targetDisplayName = targetName,
-                                                targetPhotoUrl = targetPhoto
-                                            )
-                                            loadingFriendAction = false
-                                            if (chatId.isNotBlank()) {
-                                                onOpenFriendChat(chatId)
-                                            } else {
-                                                alertMessage = "No se pudo abrir el chat"
+                                            try {
+                                                val chatId = chatRepository.createOrGetDirectChat(
+                                                    currentUid = currentUserId,
+                                                    currentDisplayName = myName,
+                                                    currentPhotoUrl = myPhoto,
+                                                    targetUid = targetUid,
+                                                    targetDisplayName = targetName,
+                                                    targetPhotoUrl = targetPhoto
+                                                )
+                                                if (chatId.isNotBlank()) {
+                                                    onOpenFriendChat(chatId)
+                                                } else {
+                                                    alertMessage = "No se pudo abrir el chat"
+                                                }
+                                            } catch (e: Exception) {
+                                                alertMessage = e.message ?: "No se pudo abrir el chat"
+                                            } finally {
+                                                loadingFriendAction = false
                                             }
                                         }
                                     }

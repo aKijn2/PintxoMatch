@@ -87,11 +87,13 @@ class ChatRepository {
         targetPhotoUrl: String
     ): String {
         val chatKey = directChatKey(currentUid, targetUid)
-        val existing = chatsRef.orderByChild("chatKey").equalTo(chatKey).get().await()
-        existing.children.firstOrNull()?.key?.let { return it }
+        val directRef = chatsRef.child(chatKey)
+        val existing = directRef.get().await()
+        if (existing.exists()) {
+            return chatKey
+        }
 
-        val newRef = chatsRef.push()
-        newRef.setValue(
+        directRef.setValue(
             mapOf(
                 "chatType" to "friend_direct",
                 "chatKey" to chatKey,
@@ -113,7 +115,7 @@ class ChatRepository {
             )
         ).await()
 
-        return newRef.key.orEmpty()
+        return chatKey
     }
 
     fun getChatMessagesFlow(chatId: String): Flow<List<ChatMessage>> = callbackFlow {
