@@ -82,7 +82,7 @@ fun AppNavigation(
                             context = context,
                             title = alert.title,
                             body = alert.body,
-                            chatId = alert.chatId
+                            route = alert.route.ifBlank { "chat/${alert.chatId}" }
                         )
                     }
 

@@ -37,7 +37,7 @@ object NotificationHelper {
         context: Context,
         title: String,
         body: String,
-        chatId: String?
+        route: String?
     ) {
         ensureChannels(context)
 
@@ -50,11 +50,11 @@ object NotificationHelper {
 
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("open_chat_id", chatId)
+            putExtra("open_route", route)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
-            chatId?.hashCode() ?: 0,
+            route?.hashCode() ?: 0,
             openAppIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -71,7 +71,7 @@ object NotificationHelper {
 
         try {
             NotificationManagerCompat.from(context).notify(
-                chatId?.hashCode() ?: (System.currentTimeMillis() % Int.MAX_VALUE).toInt(),
+                route?.hashCode() ?: (System.currentTimeMillis() % Int.MAX_VALUE).toInt(),
                 notification
             )
         } catch (_: SecurityException) {

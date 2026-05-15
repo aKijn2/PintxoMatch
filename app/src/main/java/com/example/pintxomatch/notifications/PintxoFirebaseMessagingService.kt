@@ -32,7 +32,7 @@ class PintxoFirebaseMessagingService : FirebaseMessagingService() {
             context = applicationContext,
             title = title,
             body = body,
-            chatId = chatId
+            route = message.data["route"] ?: chatId?.let { "chat/$it" }
         )
     }
 }

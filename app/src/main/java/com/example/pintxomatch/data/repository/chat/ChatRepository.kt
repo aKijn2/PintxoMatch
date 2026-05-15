@@ -24,7 +24,8 @@ class ChatRepository {
         val title: String,
         val body: String,
         val senderId: String,
-        val timestamp: Long
+        val timestamp: Long,
+        val route: String
     )
 
     fun getUserChatsFlow(currentUid: String): Flow<List<ChatListItem>> = callbackFlow {
@@ -179,7 +180,8 @@ class ChatRepository {
                         title = title,
                         body = body,
                         senderId = senderId,
-                        timestamp = timestamp
+                        timestamp = timestamp,
+                        route = node.child("route").getValue(String::class.java).orEmpty()
                     )
                 }.sortedByDescending { it.timestamp }
                 trySend(alerts)
@@ -276,7 +278,8 @@ class ChatRepository {
                     "title" to recipientTitle,
                     "body" to text,
                     "senderId" to currentUid,
-                    "timestamp" to System.currentTimeMillis()
+                    "timestamp" to System.currentTimeMillis(),
+                    "route" to "chat/$chatId"
                 )
             ).await()
         }
@@ -414,6 +417,22 @@ class ChatRepository {
                 "status" to "open",
                 "resolvedBy" to null,
                 "resolvedAt" to null
+            )
+        ).await()
+
+        val supportTitle = if (threadId == currentUid) {
+            "Soporte"
+        } else {
+            senderName
+        }
+
+        userInboxRef.child(threadId).child("chatAlerts").child("support_$threadId").setValue(
+            mapOf(
+                "title" to supportTitle,
+                "body" to text,
+                "senderId" to currentUid,
+                "timestamp" to System.currentTimeMillis(),
+                "route" to "support"
             )
         ).await()
     }
