@@ -12,6 +12,7 @@ $tunnelInfoPath = Join-Path $repoRoot "scripts\.cloudflare-tunnel.json"
 $runStamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $cloudflaredLogPath = Join-Path $env:TEMP "pintxomatch-cloudflared-$runStamp.log"
 $cloudflaredErrLogPath = Join-Path $env:TEMP "pintxomatch-cloudflared-$runStamp.err.log"
+$localPropertiesUpdated = $false
 
 function Assert-Command {
     param([string]$Name)
@@ -293,10 +294,17 @@ try {
     $health = Wait-ForHealth -Uri "http://localhost:8080/health" -TimeoutSeconds 40
     Start-Sleep -Seconds 2
     Assert-ProcessAlive -ProcessId $cloudflaredProcess.Id -ProcessNameForMessage "cloudflared"
-    $publicHealth = Wait-ForPublicHealth -Uri "$tunnelUrl/health" -TimeoutSeconds ([Math]::Max($TunnelTimeoutSeconds, 60))
+    $publicHealth = $null
+    if (-not $SkipDefaultResolverCheck) {
+        $publicHealth = Wait-ForPublicHealth -Uri "$tunnelUrl/health" -TimeoutSeconds ([Math]::Max($TunnelTimeoutSeconds, 60))
+    }
+    else {
+        Write-Warning "Skipping public health check because local DNS resolution was explicitly skipped."
+    }
     Assert-ProcessAlive -ProcessId $cloudflaredProcess.Id -ProcessNameForMessage "cloudflared"
 
     Set-Or-AppendProperty -FilePath $localPropertiesPath -Key "LOCAL_IMAGE_BASE_URL" -Value $tunnelUrl
+    $localPropertiesUpdated = $true
 
     @{
         tunnelUrl = $tunnelUrl
@@ -311,7 +319,12 @@ try {
     Write-Host "- LOCAL_IMAGE_BASE_URL updated in local.properties"
     Write-Host "- PUBLIC_BASE_URL set in image server container"
     Write-Host "- Health check ok: $($health.ok)"
-    Write-Host "- Public health check ok: $($publicHealth.ok)"
+    if ($publicHealth) {
+        Write-Host "- Public health check ok: $($publicHealth.ok)"
+    }
+    else {
+        Write-Host "- Public health check skipped (local DNS resolver check disabled)"
+    }
     Write-Host "- cloudflared PID: $($cloudflaredProcess.Id)"
     Write-Host "- Log file: $cloudflaredLogPath"
     Write-Host "- Error log file: $cloudflaredErrLogPath"
@@ -325,7 +338,7 @@ catch {
             Stop-Process -Id $cloudflaredProcess.Id -Force -ErrorAction SilentlyContinue
         }
     }
-    if ($previousLocalImageBaseUrl) {
+    if ($previousLocalImageBaseUrl -and -not $localPropertiesUpdated) {
         Set-Or-AppendProperty -FilePath $localPropertiesPath -Key "LOCAL_IMAGE_BASE_URL" -Value $previousLocalImageBaseUrl
     }
     Write-Error $_
